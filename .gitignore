@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+
+# Ambiente virtual
+venv/
+.env/
+
+# Uploads (não versionar PDFs)
+uploads/
+
+# IDE
+.vscode/
+
+# Sistema
+.DS_Store
