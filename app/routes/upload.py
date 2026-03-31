@@ -7,7 +7,7 @@ from app.services.pdf_reader import extract_text_from_pdf
 from app.services.chunker import chunk_text
 from app.services.embeddings import generate_embeddings
 from app.services.query import DOCUMENTS
-from app.services.database import save_document  # 🔥 NOVO
+from app.services.database import save_document
 
 import faiss
 import numpy as np
@@ -38,9 +38,12 @@ async def upload_pdf(file: UploadFile = File(...)):
         if not file.filename.lower().endswith(".pdf"):
             raise HTTPException(status_code=400, detail="Apenas PDFs são permitidos")
 
+        # 🔥 ID REAL DO DOCUMENTO (ESSENCIAL)
+        doc_id = str(uuid4())
+
         file_extension = file.filename.split(".")[-1]
-        unique_name = f"{uuid4()}.{file_extension}"
-        file_path = os.path.join(UPLOAD_DIR, unique_name)
+        unique_filename = f"{doc_id}.{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, unique_filename)
 
         # salva arquivo
         with open(file_path, "wb") as buffer:
@@ -51,50 +54,50 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         if not text:
             return {
-                "filename": unique_name,
+                "doc_id": doc_id,
                 "chunks": 0,
                 "preview": "PDF sem texto detectado"
             }
 
-        # 🔥 chunking
+        # chunking
         chunks = chunk_text(text)
 
         if not chunks:
             return {
-                "filename": unique_name,
+                "doc_id": doc_id,
                 "chunks": 0,
                 "preview": "Erro ao gerar chunks"
             }
 
-        # 🔥 estrutura documentos
+        # estrutura documentos
         documents = [
             {"text": chunk, "id": i}
             for i, chunk in enumerate(chunks)
         ]
 
-        # 🔥 embeddings
+        # embeddings
         embeddings = generate_embeddings([doc["text"] for doc in documents])
 
         if not embeddings:
             return {
-                "filename": unique_name,
+                "doc_id": doc_id,
                 "error": "Erro ao gerar embeddings"
             }
 
-        # 🔥 FAISS
+        # FAISS
         index = create_faiss_index(embeddings)
 
-        # 🔥 memória (cache)
-        DOCUMENTS[unique_name] = {
+        # memória (cache)
+        DOCUMENTS[doc_id] = {
             "documents": documents,
             "index": index
         }
 
-        # 🔥 persistência (AQUI É O DIFERENCIAL)
-        save_document(unique_name, documents, index)
+        # persistência
+        save_document(doc_id, documents, index)
 
         return {
-            "filename": unique_name,
+            "doc_id": doc_id,
             "chunks": len(documents),
             "preview": documents[0]["text"]
         }
@@ -103,4 +106,4 @@ async def upload_pdf(file: UploadFile = File(...)):
         raise
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))

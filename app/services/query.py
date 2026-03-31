@@ -9,23 +9,41 @@ from app.services.reranker import rerank
 
 router = APIRouter()
 
-# 🔥 cache em memória
 DOCUMENTS = {}
-
 DATA_DIR = "data"
+
+
+# 🔥 melhora a query antes do embedding/search
+def rewrite_query(question: str) -> str:
+    """
+    Normaliza a pergunta para melhorar retrieval.
+    """
+    return question.strip().lower()
+
+
+# 🔥 reduz ruído antes de mandar pro LLM
+def build_context(chunks):
+    formatted = []
+
+    for i, c in enumerate(chunks, 1):
+        formatted.append(f"[TRECHO {i}]\n{c}")
+
+    return "\n\n".join(formatted)
 
 
 @router.post("/ask")
 async def ask_question(data: dict):
     question = data.get("question")
-    doc_id = data.get("doc_id")  # agora opcional
+    doc_id = data.get("doc_id")
 
     if not question:
         return {"error": "question é obrigatório"}
 
+    question = rewrite_query(question)
+
     all_results = []
 
-    # 🔥 CASO 1: busca em documento específico
+    # 🔥 CASO 1: documento específico
     if doc_id:
         if doc_id not in DOCUMENTS:
             loaded = load_document(doc_id)
@@ -35,7 +53,7 @@ async def ask_question(data: dict):
 
         docs = [DOCUMENTS[doc_id]]
 
-    # 🔥 CASO 2: busca em TODOS os documentos
+    # 🔥 CASO 2: todos documentos
     else:
         docs = []
 
@@ -54,25 +72,32 @@ async def ask_question(data: dict):
         if not docs:
             return {"error": "Nenhum documento disponível"}
 
-    # 🔥 busca em todos os docs
+    # 🔥 RETRIEVAL MAIS FORTE (top-k maior aqui)
     for doc in docs:
         results = search(
             query=question,
             model=model,
             index=doc["index"],
             documents=doc["documents"],
-            k=3
+            k=10   # 🔥 mais candidatos = melhor rerank
         )
         all_results.extend(results)
 
-    # 🔥 limita os melhores (simples)
-    candidate_chunks = all_results[:8]
-    top_chunks = rerank(question, candidate_chunks, top_k=3)  # 🔥 menos contexto
+    if not all_results:
+        return {
+            "question": question,
+            "answer": "Não encontrei informações relevantes no documento.",
+            "sources": []
+        }
 
-    # contexto final
-    context = "\n\n".join(top_chunks)
+    # 🔥 rerank forte (fase final de seleção)
+    candidate_chunks = all_results[:20]
+    top_chunks = rerank(question, candidate_chunks, top_k=5)
 
-    # resposta do LLM
+    # 🔥 contexto limpo e estruturado
+    context = build_context(top_chunks)
+
+    # 🔥 geração com contexto melhor estruturado
     answer = generate_answer(question, context)
 
     return {
@@ -82,7 +107,7 @@ async def ask_question(data: dict):
     }
 
 
-# 🔥 compatibilidade com imports antigos
+# 🔥 compatibilidade com código antigo
 def search_similar_documents(question: str, doc_id: str = None):
     if not doc_id:
         return []
@@ -93,15 +118,14 @@ def search_similar_documents(question: str, doc_id: str = None):
             return []
         DOCUMENTS[doc_id] = loaded
 
-    documents = DOCUMENTS[doc_id]["documents"]
-    index = DOCUMENTS[doc_id]["index"]
+    doc = DOCUMENTS[doc_id]
 
     results = search(
         query=question,
         model=model,
-        index=index,
-        documents=documents,
-        k=5
+        index=doc["index"],
+        documents=doc["documents"],
+        k=8
     )
 
     return results

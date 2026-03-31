@@ -6,23 +6,19 @@ MODEL = "llama3.1"
 
 def build_prompt(question: str, context: str) -> str:
     return f"""
-Você é um assistente inteligente que responde perguntas com base em documentos.
+Você é um assistente especializado em análise de documentos.
+
+Sua tarefa é entender o DOCUMENTO como um todo, não apenas trechos isolados.
 
 REGRAS:
-- Responda de forma clara, objetiva e natural
-- Você PODE interpretar e resumir o conteúdo
-- NÃO precisa copiar exatamente o texto
-- Use apenas informações do contexto
-- Se a resposta não estiver clara, diga que não encontrou
-- Responda com segurança, sem usar expressões como "parece" ou "provavelmente"
+- Identifique os temas principais do documento
+- Combine informações de diferentes partes
+- NÃO responda apenas listando termos
+- NÃO diga "não encontrei informações suficientes" se houver contexto relevante
+- Sempre tente inferir o tema central do documento
+- Seja claro e objetivo
 
-CASOS ESPECIAIS (extração direta):
-- Nome → retorne apenas o nome completo
-- Email → retorne apenas o email
-- Telefone → retorne apenas o número
-- Cargo → retorne apenas o cargo
-
-CONTEXTO:
+CONTEXTO DO DOCUMENTO:
 {context}
 
 PERGUNTA:
