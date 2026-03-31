@@ -1,15 +1,22 @@
+import re
+
 def chunk_text(text: str, chunk_size: int = 500, overlap: int = 100):
+    sentences = re.split(r'(?<=[.!?]) +', text)
+
     chunks = []
+    current_chunk = ""
 
-    start = 0
-    text_length = len(text)
+    for sentence in sentences:
+        if len(current_chunk) + len(sentence) <= chunk_size:
+            current_chunk += sentence + " "
+        else:
+            chunks.append(current_chunk.strip())
 
-    while start < text_length:
-        end = start + chunk_size
-        chunk = text[start:end]
+            # cria overlap inteligente
+            overlap_text = current_chunk[-overlap:]
+            current_chunk = overlap_text + sentence + " "
 
-        chunks.append(chunk)
-
-        start += chunk_size - overlap
+    if current_chunk:
+        chunks.append(current_chunk.strip())
 
     return chunks

@@ -1,19 +1,14 @@
-import numpy as np
+def search(query, model, index, documents, k=3):
+    # embedding da pergunta
+    query_embedding = model.encode(
+        [query],
+        normalize_embeddings=True
+    )
 
-def cosine_similarity(a, b):
-    a = np.array(a)
-    b = np.array(b)
+    # busca no FAISS
+    distances, indices = index.search(query_embedding, k)
 
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+    # pega os melhores chunks
+    results = [documents[i]["text"] for i in indices[0]]
 
-
-def find_most_similar(query_embedding, embeddings, top_k=3):
-    similarities = []
-
-    for i, emb in enumerate(embeddings):
-        sim = cosine_similarity(query_embedding, emb)
-        similarities.append((i, sim))
-
-    similarities.sort(key=lambda x: x[1], reverse=True)
-
-    return similarities[:top_k]
+    return results

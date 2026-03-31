@@ -1,59 +1,107 @@
 from fastapi import APIRouter
-from app.services.embeddings import generate_embeddings
-from app.services.similarity import find_most_similar
-from app.services.llm import generate_answer  # 🔥 OLLAMA
+import os
+
+from app.services.similarity import search
+from app.services.embeddings import model
+from app.services.llm import generate_answer
+from app.services.database import load_document
+from app.services.reranker import rerank
 
 router = APIRouter()
 
-# TEMP: memória em RAM (MVP)
+# 🔥 cache em memória
 DOCUMENTS = {}
+
+DATA_DIR = "data"
 
 
 @router.post("/ask")
 async def ask_question(data: dict):
     question = data.get("question")
-    doc_id = data.get("doc_id")
+    doc_id = data.get("doc_id")  # agora opcional
 
-    if not question or not doc_id:
-        return {"error": "question e doc_id são obrigatórios"}
+    if not question:
+        return {"error": "question é obrigatório"}
 
-    if doc_id not in DOCUMENTS:
-        return {"error": "Documento não encontrado"}
+    all_results = []
 
-    chunks = DOCUMENTS[doc_id]["chunks"]
-    embeddings = DOCUMENTS[doc_id]["embeddings"]
+    # 🔥 CASO 1: busca em documento específico
+    if doc_id:
+        if doc_id not in DOCUMENTS:
+            loaded = load_document(doc_id)
+            if not loaded:
+                return {"error": "Documento não encontrado"}
+            DOCUMENTS[doc_id] = loaded
 
-    # embedding da pergunta
-    query_embedding = generate_embeddings([question])[0]
+        docs = [DOCUMENTS[doc_id]]
 
-    # busca semântica
-    results = find_most_similar(query_embedding, embeddings)
+    # 🔥 CASO 2: busca em TODOS os documentos
+    else:
+        docs = []
 
-    # pega top chunks (melhorado)
-    top_chunks = [chunks[i] for i, _ in results[:5]]  # 🔥 aumentei cobertura
+        for file in os.listdir(DATA_DIR):
+            if file.endswith(".faiss"):
+                current_id = file.replace(".faiss", "")
+
+                if current_id not in DOCUMENTS:
+                    loaded = load_document(current_id)
+                    if loaded:
+                        DOCUMENTS[current_id] = loaded
+
+                if current_id in DOCUMENTS:
+                    docs.append(DOCUMENTS[current_id])
+
+        if not docs:
+            return {"error": "Nenhum documento disponível"}
+
+    # 🔥 busca em todos os docs
+    for doc in docs:
+        results = search(
+            query=question,
+            model=model,
+            index=doc["index"],
+            documents=doc["documents"],
+            k=3
+        )
+        all_results.extend(results)
+
+    # 🔥 limita os melhores (simples)
+    candidate_chunks = all_results[:8]
+    top_chunks = rerank(question, candidate_chunks, top_k=3)  # 🔥 menos contexto
 
     # contexto final
     context = "\n\n".join(top_chunks)
 
-    # 🔥 AGORA USA OLLAMA
+    # resposta do LLM
     answer = generate_answer(question, context)
 
     return {
         "question": question,
         "answer": answer,
-        "context": top_chunks
+        "sources": top_chunks
     }
 
 
 # 🔥 compatibilidade com imports antigos
 def search_similar_documents(question: str, doc_id: str = None):
-    if not doc_id or doc_id not in DOCUMENTS:
+    if not doc_id:
         return []
 
-    chunks = DOCUMENTS[doc_id]["chunks"]
-    embeddings = DOCUMENTS[doc_id]["embeddings"]
+    if doc_id not in DOCUMENTS:
+        loaded = load_document(doc_id)
+        if not loaded:
+            return []
+        DOCUMENTS[doc_id] = loaded
 
-    query_embedding = generate_embeddings([question])[0]
-    results = find_most_similar(query_embedding, embeddings)
+    documents = DOCUMENTS[doc_id]["documents"]
+    index = DOCUMENTS[doc_id]["index"]
 
-    return [chunks[i] for i, _ in results]  
+    results = search(
+        query=question,
+        model=model,
+        index=index,
+        documents=documents,
+        k=5
+    )
+
+    return results
