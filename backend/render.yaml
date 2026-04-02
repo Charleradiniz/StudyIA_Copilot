@@ -8,9 +8,9 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: OLLAMA_URL
+      - key: GEMINI_API_KEY
         sync: false
-      - key: OLLAMA_MODEL
-        value: llama3.1
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash-lite
       - key: CORS_ORIGINS
         sync: false

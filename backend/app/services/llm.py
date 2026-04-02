@@ -1,6 +1,6 @@
 import requests
 
-from app.config import OLLAMA_MODEL, OLLAMA_URL
+from app.config import GEMINI_API_KEY, GEMINI_MODEL
 
 
 def build_prompt(question: str, context: str) -> str:
@@ -28,26 +28,54 @@ RESPOSTA:
 
 
 def generate_answer(question: str, context: str) -> str:
+    if not GEMINI_API_KEY:
+        return "Google AI Studio API key is not configured."
+
     prompt = build_prompt(question, context)
+    endpoint = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{GEMINI_MODEL}:generateContent"
+    )
 
     try:
         response = requests.post(
-            OLLAMA_URL,
+            endpoint,
+            headers={
+                "x-goog-api-key": GEMINI_API_KEY,
+                "Content-Type": "application/json",
+            },
             json={
-                "model": OLLAMA_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "temperature": 0.2  # Slight balance between precision and interpretation
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "text": prompt,
+                            }
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.2,
+                },
             },
             timeout=300
         )
 
         response.raise_for_status()
 
-        return response.json()["response"].strip()
+        payload = response.json()
+        candidates = payload.get("candidates") or []
+        if not candidates:
+            return "The model returned no candidates."
+
+        content = candidates[0].get("content", {})
+        parts = content.get("parts") or []
+        text = "".join(part.get("text", "") for part in parts if part.get("text"))
+
+        return text.strip() or "The model returned an empty response."
 
     except requests.exceptions.Timeout:
-        return "O modelo demorou muito para responder. Tente novamente."
+        return "The model took too long to respond. Please try again."
 
     except Exception as e:
-        return f"Erro ao chamar Ollama: {str(e)}"
+        return f"Error calling Google AI Studio: {str(e)}"
