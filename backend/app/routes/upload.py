@@ -3,18 +3,18 @@ import shutil
 import os
 from uuid import uuid4
 
-from app.services.pdf_reader import extract_text_from_pdf
-from app.services.chunker import chunk_text
+from app.services.pdf_reader import extract_chunks_with_positions
 from app.services.embeddings import generate_embeddings
 from app.services.query import DOCUMENTS
-from app.services.database import save_document
+from app.services.storage import save_document
+
+from app.config import UPLOAD_DIR  # Import from the shared config module
 
 import faiss
 import numpy as np
 
 router = APIRouter()
 
-UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -35,75 +35,113 @@ def create_faiss_index(embeddings):
 @router.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
     try:
-        if not file.filename.lower().endswith(".pdf"):
-            raise HTTPException(status_code=400, detail="Apenas PDFs são permitidos")
+        # =========================
+        # VALIDATION
+        # =========================
+        if not file.filename or not file.filename.lower().endswith(".pdf"):
+            raise HTTPException(
+                status_code=400,
+                detail="Apenas PDFs são permitidos"
+            )
 
-        # 🔥 ID REAL DO DOCUMENTO (ESSENCIAL)
         doc_id = str(uuid4())
+        original_name = file.filename
 
-        file_extension = file.filename.split(".")[-1]
-        unique_filename = f"{doc_id}.{file_extension}"
-        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+        file_path = os.path.join(UPLOAD_DIR, f"{doc_id}.pdf")
 
-        # salva arquivo
+        # =========================
+        # SAVE FILE
+        # =========================
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # extrai texto
-        text = extract_text_from_pdf(file_path)
-
-        if not text:
-            return {
-                "doc_id": doc_id,
-                "chunks": 0,
-                "preview": "PDF sem texto detectado"
-            }
-
-        # chunking
-        chunks = chunk_text(text)
+        # =========================
+        # PDF EXTRACTION
+        # =========================
+        chunks = extract_chunks_with_positions(file_path)
 
         if not chunks:
             return {
                 "doc_id": doc_id,
+                "name": original_name,
                 "chunks": 0,
-                "preview": "Erro ao gerar chunks"
+                "preview": "PDF sem texto detectado"
             }
 
-        # estrutura documentos
+        # =========================
+        # DOCUMENT STRUCTURE
+        # =========================
         documents = [
-            {"text": chunk, "id": i}
-            for i, chunk in enumerate(chunks)
+            {
+                "text": chunk["text"],
+                "id": chunk["id"],
+                "doc_id": doc_id,
+                "file_id": doc_id,
+                "page": chunk["page"],
+                "bbox": chunk["bbox"],
+                "line_boxes": chunk.get("line_boxes", []),
+                "char_length": chunk.get("char_length", len(chunk["text"])),
+            }
+            for chunk in chunks
         ]
 
-        # embeddings
-        embeddings = generate_embeddings([doc["text"] for doc in documents])
+        # =========================
+        # EMBEDDINGS
+        # =========================
+        embeddings = generate_embeddings(
+            [doc["text"] for doc in documents]
+        )
 
-        if not embeddings:
+        if embeddings is None or len(embeddings) == 0:
             return {
                 "doc_id": doc_id,
+                "name": original_name,
                 "error": "Erro ao gerar embeddings"
             }
 
-        # FAISS
+        # =========================
+        # FAISS INDEX
+        # =========================
         index = create_faiss_index(embeddings)
 
-        # memória (cache)
+        # =========================
+        # IN-MEMORY CACHE
+        # =========================
         DOCUMENTS[doc_id] = {
             "documents": documents,
-            "index": index
+            "index": index,
+            "name": original_name,
+            "path": file_path
         }
 
-        # persistência
-        save_document(doc_id, documents, index)
+        # =========================
+        # PERSISTENCE
+        # =========================
+        save_document(
+            doc_id,
+            documents,
+            index,
+            metadata={
+                "filename": original_name,
+                "path": file_path
+            }
+        )
 
+        # =========================
+        # RESPONSE
+        # =========================
         return {
             "doc_id": doc_id,
+            "name": original_name,
             "chunks": len(documents),
-            "preview": documents[0]["text"]
+            "preview": documents[0]["text"][:200]
         }
 
     except HTTPException:
         raise
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )

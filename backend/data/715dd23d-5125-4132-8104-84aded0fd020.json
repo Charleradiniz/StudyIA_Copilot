@@ -1,0 +1,260 @@
+{
+  "documents": [
+    {
+      "text": "Charles Vinicius Diniz da Silva",
+      "id": 0,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        85.10399627685547,
+        71.54000854492188,
+        439.5820007324219,
+        98.30001068115234
+      ]
+    },
+    {
+      "text": "Pinhais, PR – Brazil +55 41 99775-4240 charles.vinicius.1994@gmail.com GitHub: https://github.com/Charleradiniz/",
+      "id": 1,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        85.10399627685547,
+        112.75999450683594,
+        304.58599853515625,
+        167.5399627685547
+      ]
+    },
+    {
+      "text": "Professional Summary",
+      "id": 2,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        85.10399627685547,
+        209.8099822998047,
+        285.2539978027344,
+        229.87997436523438
+      ]
+    },
+    {
+      "text": "Full Stack Developer with hands-on experience building modern web applications and automating complex processes. Proficient in React, TypeScript, Node.js, and Python, with a strong focus on scalable systems, performance, and clean architecture.",
+      "id": 3,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        85.10399627685547,
+        244.40000915527344,
+        481.7159729003906,
+        299.2099914550781
+      ]
+    },
+    {
+      "text": "Background in geotechnology and data analysis, bringing a unique analytical mindset to software development. Experienced in developing end-to-end solutions, from intuitive frontends to robust backend systems and database integration.",
+      "id": 4,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        85.10399627685547,
+        313.66998291015625,
+        495.362060546875,
+        368.4499816894531
+      ]
+    },
+    {
+      "text": "Professional Experience",
+      "id": 5,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        85.10399627685547,
+        410.719970703125,
+        299.29400634765625,
+        430.78997802734375
+      ]
+    },
+    {
+      "text": "Full Stack Developer (Freelancer)",
+      "id": 6,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        85.10399627685547,
+        445.33819580078125,
+        302.73968505859375,
+        460.45758056640625
+      ]
+    },
+    {
+      "text": "Pinhais, PR – Brazil May 2022 – Present",
+      "id": 7,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        85.10399627685547,
+        474.9700012207031,
+        195.83599853515625,
+        502.14996337890625
+      ]
+    },
+    {
+      "text": " Developed web applications using React.js, TypeScript, and Tailwind CSS  Built modern, component-based UI using libraries such as shadcn/ui  Designed and implemented backend services with Node.js  Modeled and managed SQL databases  Automated workflows using Python and ArcPy  Integrated frontend and backend systems in fullstack applications  Built dashboards and data-driven systems for operational insights",
+      "id": 8,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        103.0999984741211,
+        516.489990234375,
+        490.34002685546875,
+        626.469970703125
+      ]
+    },
+    {
+      "text": "Planning Analyst (Mid-Level)",
+      "id": 9,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        85.10399627685547,
+        668.7081909179688,
+        273.3396911621094,
+        683.8275756835938
+      ]
+    },
+    {
+      "text": "NGB Florestal – Curitiba, PR, Brazil Aug 2020 – May 2022",
+      "id": 10,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        85.10399627685547,
+        698.3200073242188,
+        278.5459899902344,
+        725.5
+      ]
+    },
+    {
+      "text": " Automated geospatial processes using Python and ModelBuilder  Developed tools to optimize forestry operations",
+      "id": 11,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 0,
+      "bbox": [
+        103.0999984741211,
+        739.8359985351562,
+        471.4360046386719,
+        767.0159912109375
+      ]
+    },
+    {
+      "text": " Created and maintained performance indicators (KPIs)  Translated long-term planning into operational strategies  Supported decision-making using drone imagery and geospatial data",
+      "id": 12,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 1,
+      "bbox": [
+        103.0999984741211,
+        71.09996032714844,
+        493.39599609375,
+        112.0999526977539
+      ]
+    },
+    {
+      "text": "Geoprocessing Assistant",
+      "id": 13,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 1,
+      "bbox": [
+        85.10399627685547,
+        154.3081512451172,
+        251.73968505859375,
+        169.42755126953125
+      ]
+    },
+    {
+      "text": "NGB Florestal – Curitiba, PR, Brazil Aug 2018 – Aug 2020",
+      "id": 14,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 1,
+      "bbox": [
+        85.10399627685547,
+        183.9199676513672,
+        278.5459899902344,
+        211.09996032714844
+      ]
+    },
+    {
+      "text": " Consolidated and validated multiple geospatial databases into a unified system  Managed spatial and tabular data  Operated GIS platforms (SGF and GISagri)  Structured datasets for enterprise usage",
+      "id": 15,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 1,
+      "bbox": [
+        103.0999984741211,
+        225.4399871826172,
+        501.823974609375,
+        294.0499572753906
+      ]
+    },
+    {
+      "text": "Bachelor’s Degree in Engineering Federal University of Paraná (UFPR) – Brazil 2013 – 2018",
+      "id": 16,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 1,
+      "bbox": [
+        85.10399627685547,
+        371.0299987792969,
+        327.9859924316406,
+        412.0099792480469
+      ]
+    },
+    {
+      "text": " React.js  TypeScript  Tailwind CSS  shadcn/ui",
+      "id": 17,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 1,
+      "bbox": [
+        103.0999984741211,
+        516.72998046875,
+        199.8260040283203,
+        571.510009765625
+      ]
+    },
+    {
+      "text": " Node.js  Python  C# (.NET – basic)",
+      "id": 18,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 1,
+      "bbox": [
+        103.0999984741211,
+        613.6900024414062,
+        223.1060028076172,
+        654.6699829101562
+      ]
+    },
+    {
+      "text": " Git  Process Automation  Geospatial Data (GIS, ArcPy)",
+      "id": 19,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 2,
+      "bbox": [
+        103.0999984741211,
+        71.09996032714844,
+        284.5459899902344,
+        112.0999526977539
+      ]
+    },
+    {
+      "text": " End-to-end fullstack development experience  Strong analytical and problem-solving skills  Experience automating complex workflows  Background in geospatial data systems  Results-driven mindset with focus on efficiency and scalability",
+      "id": 20,
+      "doc_id": "715dd23d-5125-4132-8104-84aded0fd020",
+      "page": 2,
+      "bbox": [
+        103.0999984741211,
+        189.0800018310547,
+        455.32598876953125,
+        257.6599426269531
+      ]
+    }
+  ],
+  "metadata": {
+    "filename": "CV_2026_EN.pdf",
+    "path": "D:\\Charles\\Estudo programação\\StudyIA\\backend\\uploads\\715dd23d-5125-4132-8104-84aded0fd020.pdf"
+  }
+}

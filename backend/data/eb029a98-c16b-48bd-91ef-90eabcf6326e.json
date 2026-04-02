@@ -1,0 +1,378 @@
+[
+  {
+    "text": "001 002 003 004 005 006 007 008 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026 027 028 029 030 031 032 033 034 035 036 037 038 039 040 041 042 043 044 045 046Spatial establishment of autotetraploid populations follows the propagation of bistable waves of advance Felipe Kauai Department of Biology, Terrestrial Ecology Unit, Ghent University, Ghent, 9000, Belgium. Corresponding author email: FelipeKauai.Pereira@UGent.be Abstract The establishment of polyploid populations is constrained by minority cytotype exclusion, whereby newly formed polyploids are lost when rare in predominantly diploid populations. Here, we consider this problem through a continuous-time approximation of a discrete model of tetraploid establishment.",
+    "id": 0
+  },
+  {
+    "text": "problem through a continuous-time approximation of a discrete model of tetraploid establishment. The spatio- temporal dynamics of sexually reproducing mixed-ploidy populations is then formally investigated using a reaction-diffusion framework, which allows us to determine the conditions for spatial invasion of tetraploids. We first study the localdynamicsofgametefrequenciesinpopulationscomposedofdiploid,triploid, and tetraploid cytotypes, where unreduced (diploid) gametes are produced at rateυand triploid cytotypes contribute viable gametes to the gamete pool at rateϕ. We show that the system admits a bistable structure and character- ize its equilibria. We then map the system to a topologically equivalent cubic approximation to gain analytical insights in spatially distributed systems.",
+    "id": 1
+  },
+  {
+    "text": "topologically equivalent cubic approximation to gain analytical insights in spatially distributed systems. In one spatial dimension, this cubic yields a closed-form traveling-wave solution and a wave speed that scales with the standard deviation of distances between mother and offspring birth locations,σ. Extending the analysis to radially symmet- ric geometry, we show that successful establishment from a localized tetraploid patch requires a critical nucleus of radiusR c, for which we derive an asymptotic approximationR c∼σp (1−ϕ2)/2υfor smallυ. We confirm these analytical predictions through numerical simulations of the full model.",
+    "id": 2
+  },
+  {
+    "text": "We confirm these analytical predictions through numerical simulations of the full model. Our analyses reveal that sufficiently large founding patches can nucleate expanding bistable waves without intrinsic tetraploid fitness advantages, or reproductive strategies that circumvent frequency-dependent selection in sexually reproducing populations.",
+    "id": 3
+  },
+  {
+    "text": "advantages, or reproductive strategies that circumvent frequency-dependent selection in sexually reproducing populations. Keywords:polyploid establishment, autotetraploids, bistable waves, reaction-diffusion 1047 048 049 050 051 052 053 054 055 056 057 058 059 060 061 062 063 064 065 066 067 068 069 070 071 072 073 074 075 076 077 078 079 080 081 082 083 084 085 086 087 088 089 090 091 0921 Introduction The establishment of populations of organisms with three or more sets of chromo- somes, that is, polyploids, is a common and evolutionarily significant phenomenon across various animal lineages, and especially in plants (Otto and Whitton 2000; Wood et al. 2009; Van De Peer et al. 2017; David 2022).",
+    "id": 4
+  },
+  {
+    "text": "Wood et al. 2009; Van De Peer et al. 2017; David 2022). The mechanisms through which polyploids establish self-sustaining populations over ecological and evolution- ary timescales are the subject of ongoing research. Since the influential analysis of Levin (1975), researchers have sought to understand how these populations establish in nature by investigating mechanisms underlying polyploidy-mediated niche evolu- tion, or reproductive strategies that circumvent frequency-dependent selection (Van De Peer et al. 2017; Baniaga et al. 2020; Van De Peer et al. 2021; Osterman et al. 2025).",
+    "id": 5
+  },
+  {
+    "text": "al. 2020; Van De Peer et al. 2021; Osterman et al. 2025). This is a consequence of the observation that unless fitness advantages are suf- ficiently large, the minority cytotype (the emerging polyploid) is expected to rapidly decay in a randomly mixing population due to frequency-dependent selection (Levin 1975). However, the ecological and evolutionary consequences of polyploidy, and espe- cially its effects on organismal fitness and niche evolution, are rather complex and unpredictable (Van De Peer et al. 2021; Meirmans and Kolář 2025). Additionally, it is not obvious whether the genetic basis of polyploid establishment is relevant to the initial establishment of polyploid populations, or to their long-term persis- tence and diversification, or both (Mortier et al. 2024).",
+    "id": 6
+  },
+  {
+    "text": "their long-term persis- tence and diversification, or both (Mortier et al. 2024). Here, we concentrate on the initial establishment of polyploids. We investigate the dynamics of sexually reproduc- ing mixed-ploidy populations without resorting toad hocassumptions pertaining to polyploid-mediatedfitness advantages,orthe various reproductivestrategies thatmay circumvent frequency-dependent selection. We seek to answer a simple and important question: considering an ancestral spatially distributed diploid population, what is the minimum size of a polyploid subpopulation that is required to initiate an expansion wave?",
+    "id": 7
+  },
+  {
+    "text": "of a polyploid subpopulation that is required to initiate an expansion wave? An important step toward a mechanistic treatment of this problem, without rely- ing on assumptions about fitness differences between cytotypes, was the seminal work of Felber (1991). The author showed that a population of autotetraploid cytotypes, that is, polyploid organisms emerging within one single species, can replace a diploid ancestral population when its frequency of unreduced (diploid) gametes produced is sufficiently high. These are gametes that fail to undergo standard chromosomal segre- gation during meiosis, and therefore, contain double the chromosome number.",
+    "id": 8
+  },
+  {
+    "text": "chromosomal segre- gation during meiosis, and therefore, contain double the chromosome number. In this idealized mixed-ploidy population, when two haploid (or diploid) gametes fuse, they produce a diploid (or tetraploid) zygote, whereas the remaining singamy events lead to unviable triploids. Later analyses by Felber and Bever (1997) showed that interme- diate triploid cytotypes can further play a significant role in the process, leading to the concept of triploid bridges (Felber and Bever 1997; Ramsey and Schemske 1998; Hus- band2004;Kauaietal.2024).Inthisframework,triploidcytotypesserveasbridgesby contributing haploid and diploid gametes to the gamete pool, but cannot themselves produce stable populations due to low fitness owing to an odd number of chromosome sets.",
+    "id": 9
+  },
+  {
+    "text": "due to low fitness owing to an odd number of chromosome sets. These early modelling efforts were crucial for understanding the emergence of 2093 094 095 096 097 098 099 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138polyploid populations because they incorporated, for the first time, the actual cyto- genetic routes by which polyploidy arises in sexually reproducing populations, and thereby were able to provide mechanistic insights into the process. It is important to note that recent theory and comparative work also highlight that thefateofnewlyformedpolyploidsdependsonavarietyofmechanismsacrossdifferent lineages.",
+    "id": 10
+  },
+  {
+    "text": "note that recent theory and comparative work also highlight that thefateofnewlyformedpolyploidsdependsonavarietyofmechanismsacrossdifferent lineages. Mechanisms that reduce minority cytotype exclusion by increasing repro- ductive assurance, including self-fertilization, clonality, perenniality, ecological drift, and assortative mating can substantially alter the probability that rare polyploids persist long enough to establish (Van Drunen and Husband 2019; Van Drunen and Friedman 2022; Clo et al. 2022; Osterman et al. 2025; Zwaenepoel 2025).",
+    "id": 11
+  },
+  {
+    "text": "Friedman 2022; Clo et al. 2022; Osterman et al. 2025; Zwaenepoel 2025). Nonetheless, the strength and direction with which these traits reduce the impact of frequency- dependent selection on polyploid establishment seem to vary widely among species, andevenpopulations,suggestingthatstrategiesofreproductiveassurancearerelevant insofar as they contribute to the fitness of a specific group within a specific context. In the present study, we therefore focus on a deliberately restricted but mechanis- tically transparent setting: sexually reproducing mixed-ploidy populations in which establishment is governed by cytotype-specific gamete production, triploid-mediated gene flow, and dispersal limitation.",
+    "id": 12
+  },
+  {
+    "text": "is governed by cytotype-specific gamete production, triploid-mediated gene flow, and dispersal limitation. Recent work has successfully integrated these components into a unified discrete- time model for panmictic populations and derived analytical conditions under which tetraploid takeover occurs, such as an explicit threshold in the frequency of unreduced gametes (Kauai et al. 2024). Together with the presence of stable mixed-ploidy equi- libria, the establishment of polyploidy in such populations seems to be contingent on an underlying bistable structure. These are systems that display an unstable configu- ration that separates two basins of attraction, such that the system converges to one of two stable equilibria depending on the initial conditions.",
+    "id": 13
+  },
+  {
+    "text": "converges to one of two stable equilibria depending on the initial conditions. Many systems in biol- ogy display bistability (Lewis and Kareiva 1993; Kéfi et al. 2007; Barton and Turelli 2011). For example, in insect populations bistable dynamics emerge within the con- text ofWolbachiabacterial infections, where the unstable equilibrium corresponds to the frequency of infected individuals above which the infection spreads to fixation, and under which it is lost (Barton and Turelli 2011). In the context of mixed-ploidy populations, the existence of an unstable separatrix has so far not been characterized, and its role in the dynamics of polyploidy remains unknown.",
+    "id": 14
+  },
+  {
+    "text": "been characterized, and its role in the dynamics of polyploidy remains unknown. Importantly, the loca- tion of an unstable equilibrium has consequences for the spatial dynamics of bistable systems, since it influences the behavior of traveling waves of advance. Unstable equi- libria influence how large initial patches of an invading type, e.g., infected individuals or a gene variant, must be to trigger an expanding wave, as well as the speed of propagation (Barton and Turelli 2011). Spatially explicit simulations of mixed-ploidy populations have been developed to explore the role of dispersal and spatial structure in the establishment of polyploid populations (Spoelhof et al. 2020; Kauai et al. 2025).",
+    "id": 15
+  },
+  {
+    "text": "establishment of polyploid populations (Spoelhof et al. 2020; Kauai et al. 2025). These simulations suggest that spatial structure can facilitate the establishment of polyploid populations by increas- ing the likelihood that successful mating events between polyploids occur, allowing the formation of local (stable) patches of polyploids. Formal mathematical treatments of these dynamics are, however, still unavailable.",
+    "id": 16
+  },
+  {
+    "text": "of polyploids. Formal mathematical treatments of these dynamics are, however, still unavailable. Moreover, while simulations suggest 3139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184that the spatial invasion of tetraploids depends on dispersal rates, triploid fitness, and the rate of unreduced gametes, the exact contribution of each parameter to spatial spread remains elusive. For instance, the role of limited dispersal has been found to be an important catalyst of polyploid establishment in both simulation and empirical studies (Baack 2005; Kauai et al. 2023, 2025).",
+    "id": 17
+  },
+  {
+    "text": "both simulation and empirical studies (Baack 2005; Kauai et al. 2023, 2025). In bistable systems, dispersal links local dynamics to global spatial structure, and thereby determines the conditions for a local patchtocollapse,remainstationary,orgeneratetravelingwavesofadvance(Lewisand Kareiva 1993; Barton and Turelli 2011). This distinction is crucial for mixed-ploidy populations, because the relevant question is not only whether tetraploids can replace diploids in a panmictic setting, but also whether a finite spatial polyploid patch can overcome diffusion of the emerging cytotype into the surrounding diploid population and nucleate an expanding wave.",
+    "id": 18
+  },
+  {
+    "text": "emerging cytotype into the surrounding diploid population and nucleate an expanding wave. Here, we address this issue by formally investigat- ing the dynamics of traveling waves in a reaction-diffusion model for the dynamics of mixed-ploidy populations. We seek to determine the conditions under which spatial invasion of tetraploids can occur, and to provide analytical results that allow direct inference of polyploid incidence across different systems. This manuscript is organized as follows. In Section 2, we introduce a continuous- timemodelforthelocaldynamicsofmixed-ploidypopulations,andintroducealemma to summarize the bistable and bifurcation properties of the system.",
+    "id": 19
+  },
+  {
+    "text": "continuous- timemodelforthelocaldynamicsofmixed-ploidypopulations,andintroducealemma to summarize the bistable and bifurcation properties of the system. In Section 3, we derive the limits of the bistable region, explicitly discuss the conditions for the tran- sition to an alternative monostable regime, and construct a topologically equivalent cubic approximation of the local dynamics that preserves the equilibria and their sta- bility properties. The resulting cubic function provides a mathematically tractable approximation for the study of the system in space.",
+    "id": 20
+  },
+  {
+    "text": "a mathematically tractable approximation for the study of the system in space. In Section 4, we then embed these dynamics into a spatially structured framework through the Fisher-KPP diffusion approximation, as introduced independently by Fisher (Fisher 1937) and Kolmogorov, PetrovskyandPiskunov(Kolmogorovetal.1937).Wethenderivetraveling-wavesolu- tions governing the spread of unreduced (diploid) gametes in a spatially distributed mixed-ploidy population. In Section 5, we extend the analysis to radially symmet- ric geometry, and derive an asymptotic approximation for the critical radius of a tetraploid patch required to nucleate an expanding wave. Finally, Section 6 discusses the biological implications of our results and the limitations of our analyses.",
+    "id": 21
+  },
+  {
+    "text": "the biological implications of our results and the limitations of our analyses. 2 Cytotype dynamics in panmictic populations Here, we derive a continuous-time approximation of a model presented by Kauai et al. (2024). Instead of considering the time-evolution of different cytotypes in a panmictic population, as in the original work of Felber (1991), the model instead tracksrecursiveupdatesofgametefrequenciesinthepopulation,sincethesedetermine which cytotypes emerge. This change of perspective allows one to more easily perform mathematical analysis and obtain closed-form expressions for equilibria. For the sake of clarity, we first derive the discrete-time model, and present the assumptions it entails.",
+    "id": 22
+  },
+  {
+    "text": "we first derive the discrete-time model, and present the assumptions it entails. Then, we summarize the most important properties of its continuous-time analog in a lemma, whose proof is laid out in detail. 4185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230Consider a large randomly mixed population consisting of three different cyto- types (diploids, triploids, and tetraploids), where gametes are allowed to freely fuse to produce zygotes. Mating is synchronous at discrete generational steps. Thus, when mating takes place, all individuals produce gametes that immediately fuse and pro- duce the zygotes that will compose the population of the next generation.",
+    "id": 23
+  },
+  {
+    "text": "duce the zygotes that will compose the population of the next generation. The zygotes display somatic ploidy equal to the sum of the ploidy of gametes from which they were produced. Ifg 1andg 2denote the frequency of haploid and diploid gametes, respec- tively, in such a panmictic unit, then free recombination results in zygotes whose frequencies areg 12for diploid,2g 1g2for triploid, andg 22for tetraploid cytotypes. We assume that triploid cytotypes contribute a reduced proportionϕ∈(0,1)of gametes to the population due to fitness costs. While diploid and tetraploid cytotypes produce unreduced (diploid and tetraploid, respectively) gametes with rateυ, half of viable gametes produced by triploid cytotypes are diploid and the other half haploid.",
+    "id": 24
+  },
+  {
+    "text": "gametes produced by triploid cytotypes are diploid and the other half haploid. Notice that a population composed solely of triploid cytotypes is therefore impossible. Ran- dom mixing of gametes will necessarily lead to the presence of diploid and tetraploid cytotypes. Most gametes produced during reproduction are either haploid or diploid, with the exception of unreduced tetraploid gametes, produced with rateυby tetraploid cytotypes. This is to ensure that tetraploids do not have a fitness advantage over their diploid counterparts. However, syngamy involving these gametes will invariably lead to ploidy levels higher than tetraploidy.",
+    "id": 25
+  },
+  {
+    "text": "involving these gametes will invariably lead to ploidy levels higher than tetraploidy. Because these cytotypes are relatively rare in nature, and there is empirical evidence to support that they may be subject to severe cytogenetic abnormalities, we assume them to be unviable. Therefore, all tetraploid gametes are disregarded to ensure that only diploid, triploid and tetraploid cytotypes are considered.",
+    "id": 26
+  },
+  {
+    "text": "disregarded to ensure that only diploid, triploid and tetraploid cytotypes are considered. This is the definition of a mixed-ploidy population we will formally workwith.Thus,underthissetofassumptions,afteronegenerationofrandommating the gamete frequencies are given by the coupled nonlinear recursive maps:   g1′=g12(1−υ) +ϕg 1g2 g12+ 2ϕg 1g2+ (1−υ)g 22 g2′=υg12+ϕg 1g2+ (1−υ)g 22 g12+ 2ϕg 1g2+ (1−υ)g22(1) Even though system(1)is coupled, because we only consider two gamete types and their joint frequencies equal unity, we can writeg 1= 1−y, wherey:=g 2. As a result, a convenient way of studying this system is to consider the time-evolution of the frequency of one gamete type only.",
+    "id": 27
+  },
+  {
+    "text": "to consider the time-evolution of the frequency of one gamete type only. For practical purposes, we will consider the rate of change of the frequency of diploid gametes in the population. A continuous- time approximation for∆yin a panmictic unit is thus given by the following ordinary differential equation: dy dt=f(y) =υ(1−y)2+ϕ(1−y)y+ (1−υ)y2−yD(y) D(y)(2) where, 5231 232 233 234 235 236 237 238 239 240 241 242 243 244 245 246 247 248 249 250 251 252 253 254 255 256 257 258 259 260 261 262 263 264 265 266 267 268 269 270 271 272 273 274 275 276D(y) = (1−y)2+ 2ϕ(1−y)y+ (1−υ)y2 In equation(2),D(y)measures the total production of gametes in the population, and the numerator measures the net production of diploid gametes in the system.",
+    "id": 28
+  },
+  {
+    "text": "the numerator measures the net production of diploid gametes in the system. SinceD(y)>0ony∈[0,1]forϕ∈(0,1)andυ∈(0,1), the qualitative dynamics of (2)are fully determined by the zeroes of its numerator. In particular, the equilibria of(2)correspond to fixed points of the discrete-time system(1). We summarize the relevant properties of(2)in the following lemma. Lemma 1(Frequency of unreduced gametes: equilibria and bistability) Consider system(2) ony∈[0,1]. The vector field admits the factorization f(y) =(y−1)Q(y) D(y)(3) where, Q(y) = (2ϕ+υ−2)y2+ (1 +υ−ϕ)y−υ The equilibria arey∗ s1= 1and the real roots ofQ(y) = 0. Assume2ϕ+υ−2<0, so that Q(y)is concave down. Then either: 1.Q(y)has two distinct rootsy∗ s2< y∗ uin[0,1), in which casey∗ s1andy∗ s2are stable, whiley∗ uis unstable.",
+    "id": 29
+  },
+  {
+    "text": "s2< y∗ uin[0,1), in which casey∗ s1andy∗ s2are stable, whiley∗ uis unstable. This characterizes the system as bistable on[0,1], withy∗ u separating the basins of attraction ofy∗ s1andy∗ s2; or 2.Q(y)has a single double root in[0,1), corresponding to a saddle-node bifurcation that marks the transition from bistability to monostability. The saddle-node bifurcation occurs at the maximum rate of unreduced gametesυ max υmax=1−ϕ 5(4) ProofRecall thaty=g 2andg 1= 1−y. Ify= 1, then the first equation of system(1)is zero while the second remains fixed at one, i.e., the gamete pool contains only diploid gametes. Hence,y= 1is a fixed point of the discrete system(1)and therefore an equilibrium of the associated continuous-time approximation(2).",
+    "id": 30
+  },
+  {
+    "text": "of the discrete system(1)and therefore an equilibrium of the associated continuous-time approximation(2). As a result, the numerator of the right-hand sideof(2)mustbedivisibleby(y−1).Toseeitmoreexplicitly,write(2)asf(y) =N(y)/D(y), where N(y) =υ(1−y)2+ϕ(1−y)y+ (1−υ)y2−yD(y) ExpandingN(y)and collecting powers ofyyields the cubic polynomial 6277 278 279 280 281 282 283 284 285 286 287 288 289 290 291 292 293 294 295 296 297 298 299 300 301 302 303 304 305 306 307 308 309 310 311 312 313 314 315 316 317 318 319 320 321 322N(y) =y3(2ϕ−2 +υ) + 3y2(1−ϕ) +y(ϕ−2υ−1) +υ One verifies directly thatN(1) = 0, consistent with the previous observations. Hence (y−1)is a factor.",
+    "id": 31
+  },
+  {
+    "text": "thatN(1) = 0, consistent with the previous observations. Hence (y−1)is a factor. DividingN(y)by(y−1)we obtain the relation: N(y) = (y−1)Q(y) from which routine algebra yields Q(y) = (2ϕ+υ−2)y2+ (1 +υ−ϕ)y−υ and thus the vector field(2)admits the factorization(3). Next, note that fory∈[0,1]D(y)>0. Hence, the equilibria of(3)are exactly the zeroes of(y−1)Q(y):y∗ s1= 1and the real roots,y∗ s2andy∗u, ofQ(y): y∗ s2, u =−(1 +υ−ϕ)±p (1 +υ−ϕ)2+ 4υ(2ϕ+υ−2) 2(2ϕ+υ−2)(5) with the roots ordered such thaty∗ s2< y∗u.",
+    "id": 32
+  },
+  {
+    "text": "(1 +υ−ϕ)2+ 4υ(2ϕ+υ−2) 2(2ϕ+υ−2)(5) with the roots ordered such thaty∗ s2< y∗u. For any interior equilibriumy∗̸= 1satisfyingQ(y∗) = 0, the first derivative off(y) evaluated aty∗is f′\u0000 y∗\u0001 =(y∗−1)Q′(y∗) D(y∗)(6) Since(2ϕ+υ−2)<0,Q(y)describesa concavedownparabolaand,as aresult,Q′(y∗ s2)> 0andQ′(y∗u)<0, which implies thatf′(y∗ s2)<0andf′(y∗u)>0, asD(y)>0for any y∈[0,1]and both roots are strictly less than unity. Thus, it follows thaty∗ s2is stable and y∗uis unstable, with their ordering asy∗ s2< y∗u< y∗ s1. Finally, the coalescence ofy∗ s2andy∗uimplies that the roots ofQ(y)are annihilated and the only remaining stable equilibrium of(3)is thusy∗ s1= 1. This condition is met when the discriminant of(4)is zero, which characterizes a saddle-node bifurcation.",
+    "id": 33
+  },
+  {
+    "text": "is met when the discriminant of(4)is zero, which characterizes a saddle-node bifurcation. Solving for the value ofυfor which this transition takes place, one obtains directly the relation υmax= (1−ϕ)/5.□ 3 Limits to the bistable regime and a topologically equivalent cubic function The bistablestructureof system(3)is depicted inFigure 1a forvariousvalues ofϕand υ= 0.10. The system is characterized by three roots: two stable equilibria separated by an unstable point. In this figure, we highlight a special case in which the transition to monostability is visible for the curve withϕ= 0.50. Under such conditions, any disturbance away from the zero frequency will lead to fixation of diploid gametes, and thus tetraploid cytotypes, since the rate of change is always positive in the interval [0,1].",
+    "id": 34
+  },
+  {
+    "text": "since the rate of change is always positive in the interval [0,1]. More generally, the boundary between monostability and bistability is shown 7323 324 325 326 327 328 329 330 331 332 333 334 335 336 337 338 339 340 341 342 343 344 345 346 347 348 349 350 351 352 353 354 355 356 357 358 359 360 361 362 363 364 365 366 367 368in Figure 1b for the entire range ofϕandυvalues. The bistable regime occurs when υ < υ max. Of interest to us are the minimum and maximum values that the separatrixy∗ u can take, as this threshold value determines how susceptible the system becomes to invasion of the minority cytotype, i.e., tetraploid takeover. For the maximum valuey∗ u can take, the logic is rather simple. We set the rate of unreduced gametesυas well as triploid fitnessϕto0.",
+    "id": 35
+  },
+  {
+    "text": "simple. We set the rate of unreduced gametesυas well as triploid fitnessϕto0. In this case, there is no external source of diploid gametes and, as such, tetraploid invasion can only take place whenyis sufficiently high to drive itself to fixation. Thus, settingυ= 0andϕ= 0in Equation(5), we obtain exactly0.5, which translates into a 25%frequency of tetraploids in a mixed-ploidy population. Conversely, the minimum value ofy∗ uis obtained at the boundary between bistable and monostable regimes. In this case, we solve fory∗ uby settingυ= (1−ϕ)/5. The discriminant is zero, and thus the system displays a single root, which corresponds to a half-stable equilibrium at1/3.",
+    "id": 36
+  },
+  {
+    "text": "system displays a single root, which corresponds to a half-stable equilibrium at1/3. This implies that, regardless of the values ofυandϕ, as long as the system evolves within the parameter space associated with bistability, polyploid takeover is only possible above a minimum frequency of unreduced gametes of1/3in the population. In a panmictic unit, this amounts to a polyploid frequency of approximately11.1%. A convenient way to study the dynamics of system(3)is to replace the full model f(y)by a cubic function that preserves the equilibria and general topology of the system. This approximation allows one to manipulate the system algebraically and obtain analytical insights that would otherwise be difficult to obtain (Barton and Turelli 2011).",
+    "id": 37
+  },
+  {
+    "text": "insights that would otherwise be difficult to obtain (Barton and Turelli 2011). This is especially relevant for the study of spatial waves of advance, as we will discuss in the next section, where traveling waves are of interest. Since the denominator of system(3)is positive in the entire domain of the function, it does not impact the qualitative structure of the phase-line (cf. Chap- ter 2 in Kuznetsov (1998)) and, therefore, the stability properties of the system are entirely determined by the three roots of the numerator. An topologically equivalent approximation to the system can be obtained with the following cubic function: gcubic(y) =k(y−y∗ s2)(1−y)(y−y∗ u) (7) wherek >0is a positive scalar that fixes the overall timescale of the reaction term.",
+    "id": 38
+  },
+  {
+    "text": "a positive scalar that fixes the overall timescale of the reaction term. The cubic approximation has the same zeros as the original reaction function and therefore reproduces the same qualitative phase-line structure on the interval [0,1]. In particular, it is positive on(0, y∗ s2), negative on(y∗ s2, y∗ u), and positive on (y∗ u,1). In this sense, the two expressions are topologically equivalent (cf. Chapter 2 in Kuznetsov (1998)). Barton and Turelli (2011) introduced this strategy to obtain ana- lytical insights into traveling-wave solutions of biological models that display bistable dynamics, such as the spread ofWolbachiain host populations.",
+    "id": 39
+  },
+  {
+    "text": "models that display bistable dynamics, such as the spread ofWolbachiain host populations. To maintain quantitative consistency with the dynamics of the system(3), we fur- ther impose that the first derivatives of(3)and(7)be equal at the separatrixy∗ u. This ensures that the cubic approximation captures the dynamics around the thresh- old separating expansion from retraction ofy. Moreover, this definition is crucial for 8369 370 371 372 373 374 375 376 377 378 379 380 381 382 383 384 385 386 387 388 389 390 391 392 393 394 395 396 397 398 399 400 401 402 403 404 405 406 407 408 409 410 411 412 413 414the analysis of the critical nucleus that we will carry out later. Under this constraint, we find thatk=f′(y∗ u)[(y∗ u−y∗ s2) (1−y∗ u)]−1.",
+    "id": 40
+  },
+  {
+    "text": "later. Under this constraint, we find thatk=f′(y∗ u)[(y∗ u−y∗ s2) (1−y∗ u)]−1. By the relation(5)in Lemma 1, one finds thatkcan be written as k=2(1−ϕ)−υ 1−υ−(1−ϕ+υ)y∗u(8) In Fig. 1c, we show various comparisons ofg cubic(y)with the full model(3). Notice that the cubic approximation preserves the zeros and local phase-line structure of the original system with reasonable accuracy, especially around the thresholdy∗ u, which determines the transition from one stable state to another. In the next section, we use this cubic approximation to derive analytical insights into the spatial dynamics of the system by considering traveling-wave solutions to the Fisher-KPP diffusion approximation.",
+    "id": 41
+  },
+  {
+    "text": "of the system by considering traveling-wave solutions to the Fisher-KPP diffusion approximation. 9415 416 417 418 419 420 421 422 423 424 425 426 427 428 429 430 431 432 433 434 435 436 437 438 439 440 441 442 443 444 445 446 447 448 449 450 451 452 453 454 455 456 457 458 459 460 Fig. 1Bistable local dynamics of the continuous-time model and its cubic approximation.(a)The continuousapproximationofthemodelf(y)isplottedfordifferentvaluesoftriploidfitnessϕ,showing the bistable structure of the dynamics in the frequencyyof diploid gametes. Here, all curves were considered with a fixed unreduced gamete rateυ= 0.10.",
+    "id": 42
+  },
+  {
+    "text": "Here, all curves were considered with a fixed unreduced gamete rateυ= 0.10. The curve withϕ= 0.50is highlighted to show the transition to monostability, where any disturbance away from the zero frequency will lead to fixation of diploid gametes.(b)Parameter space of the model in terms of the unreduced gamete rate υand triploid fitnessϕ. The dashed line indicates the saddle-node boundaryυ= (1−ϕ)/5separating bistableandmonostableregimes,whilethescaleshowsthelocationoftheunstableequilibriumy∗ u.(c) Comparison between the continuous-time approximationf(y)and the cubic approximationg cubic (y) for representative parameter combinations.",
+    "id": 43
+  },
+  {
+    "text": "the continuous-time approximationf(y)and the cubic approximationg cubic (y) for representative parameter combinations. Vertical dashed lines mark the equilibria, showing that the cubic approximation preserves the zeros and local phase-line structure of the original system 4 Diffusion approximation and traveling-wave solutions To study the spatial spread of diploid gametes, we extend the dynamics of the mixed- ploidy population derived in the previous sections to spatially distributed populations. In this case, we assume that the population is distributed across a continuous spatial domain, and that the frequencyyof diploid gametes is a function of both space and time, measured in generations.",
+    "id": 44
+  },
+  {
+    "text": "gametes is a function of both space and time, measured in generations. A natural way to combine these components is through the Fisher-KPP reaction-diffusion equation, in which local dynamics is coupled to spatial diffusion. The so-called diffusion approximation was introduced independently by Fisher (1937) and Kolmogorov et al. (1937) as a reaction-diffusion PDE on one 10461 462 463 464 465 466 467 468 469 470 471 472 473 474 475 476 477 478 479 480 481 482 483 484 485 486 487 488 489 490 491 492 493 494 495 496 497 498 499 500 501 502 503 504 505 506spatial dimensionx, which was applied to study the spatial propagation of an advan- tageous allele in a population.",
+    "id": 45
+  },
+  {
+    "text": "study the spatial propagation of an advan- tageous allele in a population. In one spatial dimension, the diffusion approximation is given by: ∂y ∂t=σ2 2∂2y ∂x2+f(y) (9) whereσ2corresponds to the variance of distances between the birth locations of mothers and their offspring, and the reaction termf(y)describes the local dynamics of the variabley. A useful approach for studying such equations is to consider a traveling-wave solution of the formy(x, t) =Y(z), wherez=x−vtrepresents a spatiotemporal frame moving with speedv(Volpert and Petrovskii 2009; Barton and Turelli 2011). Contrary to monostable systems, as studied by Fisher (Fisher 1937) and Kolmogorov et al. (Kolmogorov et al.",
+    "id": 46
+  },
+  {
+    "text": "studied by Fisher (Fisher 1937) and Kolmogorov et al. (Kolmogorov et al. 1937), in bistable systems the wave given byY(z)is a heteroclinic orbit that connects the two stable equilibriay∗ s1andy∗ s2. An explicit closed-form traveling-wave solution can be obtained when the reaction term is cubic (Lewis and Kareiva 1993; Barton and Turelli 2011). Thus, here we make use of the topologically equivalent cubic approximation introduced in the previous section to study the properties of traveling-wave solutions to the diffusion approximation(9) explicitly. Instead of using the original model(3), we replacef(y)withg cubic(y)as in Equation(7).",
+    "id": 47
+  },
+  {
+    "text": "explicitly. Instead of using the original model(3), we replacef(y)withg cubic(y)as in Equation(7). To reduce the number of parameters of the system and simplify analysis, we first rescale variables as follows: X2=2k σ2x2T=kt Z=X−cT Substituting the rescaled variables and the cubic function into the diffusion approximation(9)yields the following second-order ordinary differential equation: Y′′+cY′+ (Y−y∗ s2)(1−Y)(Y−y∗ u) = 0 (10) subject to the boundary conditions: Y(−∞) = 1, Y(∞) =y∗ s2 These conditions guarantee that the wave connects the two stable equilibria of the bistable system, with the stateY=y∗ s2ahead of the front and the stateY= 1behind it.",
+    "id": 48
+  },
+  {
+    "text": "with the stateY=y∗ s2ahead of the front and the stateY= 1behind it. An ansatz for Equation(10)that respects the boundary conditions is Y(Z) =y∗ s2+ (1−y∗ s2)P(Z), P(Z) =1 1 +eαZ Here,Y(Z)is an affine transformation of the logistic functionP(Z), which reduces to the standard sigmoidal profile wheny∗ s2= 0. The parameterαis a positive real 11507 508 509 510 511 512 513 514 515 516 517 518 519 520 521 522 523 524 525 526 527 528 529 530 531 532 533 534 535 536 537 538 539 540 541 542 543 544 545 546 547 548 549 550 551 552scalar. The functionY(Z)is especially convenient because of the following properties: i)Y′(Z) =−α (1−y∗ s2)P(1−P)and ii)Y′′(Z) =α2(1−y∗ s2)P(1−P)(1−2P).",
+    "id": 49
+  },
+  {
+    "text": "because of the following properties: i)Y′(Z) =−α (1−y∗ s2)P(1−P)and ii)Y′′(Z) =α2(1−y∗ s2)P(1−P)(1−2P). Substituting these expressions into Equation(10)and factoring outP(1−P), one finds P(1−P)h P\u0010 (1−y∗ s2)2−2α2\u0011 +α2−αc+ (1−y∗ s2)(y∗ s2−y∗ u)i = 0 (11) From Equation(11), a nontrivial solution inPrequires the affine expression in brackets to vanish, from which it follows thatα= (1−y∗ s2)/√ 2andc= (1 +y∗ s2− 2y∗ u)√ 2/2. PluggingαandcintoP(Z)and transforming the rescaled variables back into the original ones we obtain y(x, t) =y∗ s2+1−y∗ s2 1 +eω(x−c 0t)(12) where the steepness of the profile isω= (1−y∗ s2)σ−1√ k, and the wave speed is c0=σ√ k 2(1 +y∗ s2−2y∗ u) (13) Equations (12) and (13) provide an explicit description of both the shape and the speed of the planar bistable wave.",
+    "id": 50
+  },
+  {
+    "text": "of both the shape and the speed of the planar bistable wave. In particular, Equation (12) shows that the wave profile is a sigmoidal transition from the diploid equilibriumy∗ s1= 1to the lower stable equilibriumy∗ s2, whereas Equation (13) gives the corresponding propagation speedc 0. The dependence of the profile on the parameters is especially transparent: increasing the dispersal scaleσreduces the steepnessωand therefore broadens the interface, while changes inυandϕmodify the position of the lower equilibriumy∗ s2 and, through this, both the profile and the wave speed. These effects are illustrated in Fig. 2, where the analytical solution is plotted for several combinations ofσ,υ, and ϕ.",
+    "id": 51
+  },
+  {
+    "text": "where the analytical solution is plotted for several combinations ofσ,υ, and ϕ. The figure shows that broader dispersal produces smoother, more diffuse fronts, whereas variation in triploid fitness and unreduced gamete production shifts the level to which the wave converges behind the front and alters the sharpness of the transition zone.",
+    "id": 52
+  },
+  {
+    "text": "converges behind the front and alters the sharpness of the transition zone. 12553 554 555 556 557 558 559 560 561 562 563 564 565 566 567 568 569 570 571 572 573 574 575 576 577 578 579 580 581 582 583 584 585 586 587 588 589 590 591 592 593 594 595 596 597 598 0.00.20.40.60.81.0 ϕ=0.1 ϕ=0.3 ϕ=0.5 σ=5 υ=0.01 0.00.20.40.60.81.0 ϕ=0.1 ϕ=0.3 ϕ=0.5 σ=15 υ=0.01 0.00.20.40.60.81.0 ϕ=0.1 ϕ=0.3 ϕ=0.5 σ=30 υ=0.01 −30−20−10 01020300.00.20.40.60.81.0 ϕ=0.1 ϕ=0.3 ϕ=0.5 σ=5 υ=0.08 −30−20−10 01020300.00.20.40.60.81.0 ϕ=0.1 ϕ=0.3 ϕ=0.5 σ=15 υ=0.08 −30−20−10 01020300.00.20.40.60.81.0 ϕ=0.1 ϕ=0.3 ϕ=0.5 σ=30 υ=0.08 z=x−c0ty(z)Fig. 2Analytical traveling-wave profiles under the cubic approximation.",
+    "id": 53
+  },
+  {
+    "text": "ϕ=0.3 ϕ=0.5 σ=30 υ=0.08 z=x−c0ty(z)Fig. 2Analytical traveling-wave profiles under the cubic approximation. Traveling-wave solutions y(z)of the reaction-diffusion model under the cubic approximation, plotted in the comoving coor- dinatez=x−c 0t. Columns correspond to increasing dispersal varianceσ, and rows correspond to two values of the unreduced gamete rateυ. Curves correspond to different values of triploid fitness ϕ.",
+    "id": 54
+  },
+  {
+    "text": "unreduced gamete rateυ. Curves correspond to different values of triploid fitness ϕ. The figure illustrates how the wave profile broadens with increasingσ, and how changes inυand ϕmodify both the lower stable statey∗ s2and the steepness of the interface connectingy∗ s1= 1toy∗ s2 5 Asymptotic approximation of the critical radius for a stationary nucleus Here, we seek to establish the minimum size of a patch of unreduced gametes in two dimensions that can trigger an expanding traveling wave. In two dimensions, it is convenient, and biologically realistic, to work with radially symmetric equations. Thus, we define the frequency of unreduced gametes asy(r, t), wherer=p x2 1+x2 2, withx 1andx 2the Cartesian spatial coordinates.",
+    "id": 55
+  },
+  {
+    "text": "asy(r, t), wherer=p x2 1+x2 2, withx 1andx 2the Cartesian spatial coordinates. In radial coordinates, Equation(9) becomes ∂y ∂t=σ2 2\u0012∂2y ∂r2+1 r∂y ∂r\u0013 +gcubic(y) (14) Toobtainatraveling-wavedescriptionofEquation(14),wefurtherdefiney(r, t) := Y(z), wherez=r−R(t). Here,R(t)is the distance of the interface to the center of the nucleus.",
+    "id": 56
+  },
+  {
+    "text": "Here,R(t)is the distance of the interface to the center of the nucleus. Then, the resulting traveling-wave ODE for the two-dimensional radially symmetric reaction-diffusion model satisfies 13599 600 601 602 603 604 605 606 607 608 609 610 611 612 613 614 615 616 617 618 619 620 621 622 623 624 625 626 627 628 629 630 631 632 633 634 635 636 637 638 639 640 641 642 643 644σ2 2Y′′+σ2 2rY′+R′(t)Y′+gcubic(Y) = 0 (15) whereas the one-dimensional analog solves σ2 2Y′′+c0Y′+gcubic(Y) = 0 (16) Now, we compare Equations (15) and (16) near the propagating interface. The key observation is that the radially symmetric equation differs from the one-dimensional traveling-wave equation only through the curvature term(1/r)∂ ry.",
+    "id": 57
+  },
+  {
+    "text": "differs from the one-dimensional traveling-wave equation only through the curvature term(1/r)∂ ry. Since the propa- gatingfronthasfinitewidth,farfromthenucleuswemayapproximater≈R(t)across the interface. Thus, the radial front is assumed to retain the same heteroclinic profile as the planar wave, while curvature contributes only an additional termσ2/(2R(t)). Identifying the effective coefficient ofY′in the radial problem with the planar wave speedc 0and solving for the speedR′(t)of the radial front yields the following relation: R′(t) =c 0−σ2 2R(t)(17) and thus the critical radiusR cof a stationary nucleus satisfies Rc=σ2 2c0(18) Weseektoestablishthecriticalradiusforsmallυ.Inthiscase,aswehavediscussed previously, the unstable equilibriumy∗ uconverges to1/2.",
+    "id": 58
+  },
+  {
+    "text": "stationary nucleus satisfies Rc=σ2 2c0(18) Weseektoestablishthecriticalradiusforsmallυ.Inthiscase,aswehavediscussed previously, the unstable equilibriumy∗ uconverges to1/2. Importantly, under such conditions the planar wave speed is approximatelyc 0=σ√ k(y∗ s2)/2. Although we can computey∗ s2explicitly through Equation(5), the resulting expression is overly complex, and it is not immediately clear what the precise contribution of the system’s parameters to wave speed and the critical radius is. Thus, forυ≪1and fixedϕ∈ (0,1), we construct an asymptotic approximation fory∗ s2.",
+    "id": 59
+  },
+  {
+    "text": "is. Thus, forυ≪1and fixedϕ∈ (0,1), we construct an asymptotic approximation fory∗ s2. Letξ= 1−ϕ, then y∗ s2=−(1−ϕ+υ) +q (1−ϕ)2−6(1−ϕ)υ+ 5υ2 2(υ−2(1−ϕ))(19) Factoring out(1−ϕ)2from within the square root and applying a Taylor expansion aroundυ= 0,y∗ s2can be rewritten asymptotically as 14645 646 647 648 649 650 651 652 653 654 655 656 657 658 659 660 661 662 663 664 665 666 667 668 669 670 671 672 673 674 675 676 677 678 679 680 681 682 683 684 685 686 687 688 689 690y∗ s2=υ 1−ϕ+O(υ2) (20) Substituting the asymptotic approximation ofy∗ s2into the planar wave speed(13), fory∗ u= 1/2andυ→0, one obtains Rc∼σ(1−ϕ) υ√ k=σ 2υp (1−ϕ2) (21) Equation (21) makes explicit how the minimum introduction size required for suc- cessful spatial establishment depends on the biological and dispersal parameters of the system.",
+    "id": 60
+  },
+  {
+    "text": "spatial establishment depends on the biological and dispersal parameters of the system. In particular, the critical radius scales linearly with the dispersal dis- tanceσ, showing that wider dispersal increases the spatial scale over which unreduced gametes must initially be concentrated in order to avoid collapse by dilution from the surrounding diploid population. At the same time,R cdecreases inversely with the rate of unreduced gamete productionυ, indicating that even modest increases in unreduced gamete formation can substantially reduce the minimum founding size needed to nucleate an expanding wave. The dependence on triploid fitness is apparent through the factorp 1−ϕ2, so that increasingϕlowers the critical radius by weaken- ing the effective barrier to tetraploid establishment.",
+    "id": 61
+  },
+  {
+    "text": "the critical radius by weaken- ing the effective barrier to tetraploid establishment. Becauseϕis usually small (0.3) in natural populations, its contribution toR cis thus rather limited. We compare the asymptotic approximation of the critical radius with numerical simulations of the full modelf(y)in Fig. 3, showing that the approximation is accurate for a range ofυthat is commonly reported in the literature (Kreiner et al. 2017), and therefore provides a useful heuristic for understanding how the critical radius depends on fundamental parameters that are relatively accessible in natural systems.",
+    "id": 62
+  },
+  {
+    "text": "radius depends on fundamental parameters that are relatively accessible in natural systems. 15691 692 693 694 695 696 697 698 699 700 701 702 703 704 705 706 707 708 709 710 711 712 713 714 715 716 717 718 719 720 721 722 723 724 725 726 727 728 729 730 731 732 733 734 735 736 0.000 0.004 0.008 0.012 0.016 0.020 Rate of unreduced gametes 0100200300400500Critical radius R c = 0.1 = 0.3 = 0.5 Numerical R c Asymptotic R cFig. 3Critical radius required for successful radial expansion. Critical radiusR cof a localized patch of unreduced gametes as a function of the unreduced gamete rateυ, for different values of triploid fitnessϕ. Filled circles denote numerical simulations of the full modelf(y)for the critical radius, whereas open circles show the asymptotic approximation derived for smallυ.",
+    "id": 63
+  },
+  {
+    "text": "critical radius, whereas open circles show the asymptotic approximation derived for smallυ. In all cases, the critical radius decreases asυincreases, indicating that higher production of unreduced gametes lowers the minimum founding size required to initiate an expanding radial wave. Conversely, the critical radius converges asymptotically to infinity asυapproaches zero, reflecting the fact that successful establishment becomes impossible in the absence of unreduced gamete production.",
+    "id": 64
+  },
+  {
+    "text": "that successful establishment becomes impossible in the absence of unreduced gamete production. The figure also shows that increasing triploid fitnessϕreduces the critical radius, albeit to a limited extent, by weakening the effective barrier to tetraploid establishment 6 Discussion In this study, we have shown that the establishment of polyploidy in sexually repro- ducing mixed-ploidy populations is driven fundamentally by a bistable process. As such, the dynamics of these systems are characterized by the presence of an unstable equilibrium separating sporadic (low frequency) occurrences from successful invasion.",
+    "id": 65
+  },
+  {
+    "text": "of an unstable equilibrium separating sporadic (low frequency) occurrences from successful invasion. This perspective contributes to classical theory insofar as it reveals the dynamical structure of mixed-ploidy populations, which naturally determines polyploid invasion success.Inparticular,ouranalyseshighlightthatthekeydeterminantofestablishment is not only the location of stable equilibria, but the existence and properties of the 16737 738 739 740 741 742 743 744 745 746 747 748 749 750 751 752 753 754 755 756 757 758 759 760 761 762 763 764 765 766 767 768 769 770 771 772 773 774 775 776 777 778 779 780 781 782unstable threshold that must be overcome locally.",
+    "id": 66
+  },
+  {
+    "text": "777 778 779 780 781 782unstable threshold that must be overcome locally. In this sense, polyploid establish- ment is more naturally understood as a threshold-driven invasion process, analogous to systems exhibiting strong Allee effects,Wolbachiadynamics, or underdominant chromosomal rearrangements (Lewis and Kareiva 1993; Volpert and Petrovskii 2009; Barton and Turelli 2011). This implies that, even if the natural production rate of unreduced gametes is prohibitively low, successful establishment may still occur if the system is perturbed beyond the unstable threshold. The frequency of polyploids in a population may be driven beyond the unstable threshold by a variety of mechanisms.",
+    "id": 67
+  },
+  {
+    "text": "may be driven beyond the unstable threshold by a variety of mechanisms. Notably, the production of unreduced gametes may be elevated by environmental stressors, such as extreme temperatures or drought (Kreiner et al. 2017; Wang et al. 2017; Gerstner et al. 2024). A burst of unreduced (diploid) gametes in the system due to stochastic environmental fluctuations can drive the system past its threshold frequency and lead to polyploid fixation, even if the nat- ural conditions of the system do not allow for it. Similarly, environmental disturbances that cause local population bottlenecks can either increase ecological drift, which has been shown to increase the likelihood of successful polyploid establishment (Clo et al. 2022; Kauai et al.",
+    "id": 68
+  },
+  {
+    "text": "likelihood of successful polyploid establishment (Clo et al. 2022; Kauai et al. 2025), or directly increase the frequency of polyploid individuals in the population by chance. Consider, for instance, that a stable diploid population may lose a large fraction of its individuals due to an ecological disturbance, thereby exposing rarer cryptic polyploid individuals, which would then account for a higher frequency in the population. The probability of such an event is yet to be theoretically quantified. Nonetheless, an interesting result from our analysis is that, regardless of the parameter regime to which the system is subject, if the frequency of unreduced (diploid) gametes surpasses1/2, polyploids will necessarily be driven to fixation.",
+    "id": 69
+  },
+  {
+    "text": "of unreduced (diploid) gametes surpasses1/2, polyploids will necessarily be driven to fixation. An important aspect for interpreting the spatial model presented here is that the state variable is the frequency of unreduced diploid gametes, not the frequency of tetraploid individuals themselves. Conceptually, however, these quantities are closely related. In the classical mixed-ploidy system of Felber (Felber 1991), diploid gametes are the cytogenetic route through which tetraploids are continually produced, and in a population where only diploid gametes flow, zygotes will be strictly tetraploid. Consequently, a traveling wave of unreduced diploid gametes represents an advancing tetraploid domain. Naturally, the present model also has important limitations.",
+    "id": 70
+  },
+  {
+    "text": "an advancing tetraploid domain. Naturally, the present model also has important limitations. By construction, it considers the dynamics of strictly sexual mixed-ploidy populations in which estab- lishment is governed by cytotype-specific gamete production, triploid-mediated gene flow, and spatial dispersal. In doing so, it does not incorporate several other mech- anisms known to relax minority cytotype exclusion, including clonality, perenniality, and assortative mating, or even pollinator-mediated changes in mating structure (Van Drunen and Husband 2019; Clo et al. 2022; Van Drunen and Friedman 2022; Osterman et al. 2025; Zwaenepoel 2025).",
+    "id": 71
+  },
+  {
+    "text": "2022; Van Drunen and Friedman 2022; Osterman et al. 2025; Zwaenepoel 2025). These processes can increase reproductive assurance, prolong the persistence of rare polyploids, promote intracytotype matings, andreducetheeffectivestrengthoffrequency-dependentselection.Forinstance,clonal growth may facilitate local aggregation of same-cytotype individuals, whereas peren- niality increases the time window over which independent polyploidization events may overlap and reinforce one another (Van Drunen and Friedman 2022; Osterman et al. 17783 784 785 786 787 788 789 790 791 792 793 794 795 796 797 798 799 800 801 802 803 804 805 806 807 808 809 810 811 812 813 814 815 816 817 818 819 820 821 822 823 824 825 826 827 8282025).",
+    "id": 72
+  },
+  {
+    "text": "817 818 819 820 821 822 823 824 825 826 827 8282025). However, these are traits that emerge in specific groups within specific con- texts, and depart significantly from the classical mixed-ploidy populations in which the issue of minority cytotype exclusion was first described, and is most pronounced (Levin 1975;Felber1991; Ramseyand Schemske1998). Ratherthan aimingto capture all possible pathways to polyploid establishment, this study focuses on the classical mixed-ploidy population in which frequency-dependent selection is most acute. In the absence of additional mechanisms such as clonality, perenniality, or strong assortative mating, the conditions for polyploid establishment are determined more transparently by the interaction between local cytotype dynamics and spatial dif- fusion.",
+    "id": 73
+  },
+  {
+    "text": "transparently by the interaction between local cytotype dynamics and spatial dif- fusion. From this perspective, the asymptotic approximation provides a compact description of how measurable biological parameters govern the nucleation of an expanding tetraploid patch. In particular, the approximationR c∼σp (1−ϕ2)/2υ shows that the minimum radius required for successful expansion depends on the spa- tial scale of intergenerational dispersalσ, the rate of unreduced gamete production υ, and the effective contribution of triploids to the gamete pool, summarized here byϕ. These quantities are, at least in principle, accessible to empirical and experi- mental measurement. For instance, rates of unreduced gamete production have been documented across many plant systems (Kreiner et al.",
+    "id": 74
+  },
+  {
+    "text": "gamete production have been documented across many plant systems (Kreiner et al. 2017; Osterman et al. 2025). Likewise, triploid fitness can be estimated from crossing data (Burton and Husband 2001), while dispersal distances may be inferred from seed movement data. Thus, the approximation provides a natural comparative framework for inferring polyploid inci- dence across taxa. Essentially, establishment should be more likely whereR cis small, which implies that a founding tetraploid patch can nucleate an expanding wave with- out being swamped by the surrounding diploid majority. An interesting observation is that triploid fitness, embedded in the parameterϕ, makes a relatively small contribu- tion toR c.",
+    "id": 75
+  },
+  {
+    "text": "embedded in the parameterϕ, makes a relatively small contribu- tion toR c. This contrasts with the emphasis placed on the concept of triploid bridges as a fundamental engine driving polyploid establishment (Ramsey and Schemske 1998; Husband 2004; Li et al. 2022; Kauai et al. 2025). Measurement efforts aimed at estimating these fundamental quantities in natural populations should inform our understanding of the distribution of polyploidy across taxa, and the conditions under which it is more likely to arise. Declarations FundingThis work was supported by a postdoctoral fellowship from the Research Foundation - Flanders (FWO), grant number 1220426N. Competing interestsThe author declares no competing interests. Ethics approval and consent to participateNot applicable.",
+    "id": 76
+  },
+  {
+    "text": "author declares no competing interests. Ethics approval and consent to participateNot applicable. Consent for publicationNot applicable. Data availabilityAll data relevant to this study are available within the manuscript or supporting information. Materials availabilityNot applicable. Code availabilityCode to generate the numerical simulations and Fig. 3 is available at https://github.com/KauaiFe/NumericsAsymptotics_Polyploidy. 18829 830 831 832 833 834 835 836 837 838 839 840 841 842 843 844 845 846 847 848 849 850 851 852 853 854 855 856 857 858 859 860 861 862 863 864 865 866 867 868 869 870 871 872 873 874Author contributionF.K. conceived the study, performed the analytical and numerical work, prepared the figures, and wrote the manuscript.",
+    "id": 77
+  },
+  {
+    "text": "the analytical and numerical work, prepared the figures, and wrote the manuscript. References Baack EJ (2005) To succeed globally, disperse locally: effects of local pollen and seed dispersal on tetraploid establishment. Heredity 94(5):538–546. https://doi.org/10 .1038/sj.hdy.6800656, URL https://doi.org/10.1038/sj.hdy.6800656 Baniaga AE, Marx HE, Arrigo N, et al (2020) Polyploid plants have faster rates of multivariate niche differentiation than their diploid relatives. Ecology Letters 23(1):68–78. https://doi.org/10.1111/ele.13402, URL https://onlinelibrary.wiley.co m/doi/10.1111/ele.13402 Barton NH, Turelli M (2011) Spatial Waves of Advance with Bistable Dynamics: Cytoplasmic and Genetic Analogues of Allee Effects. The American Naturalist 178(3):E48–E75.",
+    "id": 78
+  },
+  {
+    "text": "Dynamics: Cytoplasmic and Genetic Analogues of Allee Effects. The American Naturalist 178(3):E48–E75. https://doi.org/10.1086/661246, URL https://www.journals.uch icago.edu/doi/10.1086/661246 Burton TL, Husband BC (2001) Fecundity and offspring ploidy in matings among diploid, triploid and tetraploid Chamerion angustifolium (Onagraceae): conse- quences for tetraploid establishment. Heredity 87(5):573–582. https://doi.org/10.1 046/j.1365-2540.2001.00955.x, URL https://www.nature.com/doifinder/10.1046/j. 1365-2540.2001.00955.x CloJ,Padilla-GarcíaN,KolářF(2022)Polyploidizationasanopportunisticmutation: The role of unreduced gametes formation and genetic drift in polyploid establish- ment. Journal of Evolutionary Biology 35(8):1099–1109.",
+    "id": 79
+  },
+  {
+    "text": "and genetic drift in polyploid establish- ment. Journal of Evolutionary Biology 35(8):1099–1109. https://doi.org/10.1111/ jeb.14055, URL https://academic.oup.com/jeb/article/35/8/1099-1109/7317889 David KT (2022) Global gradients in the distribution of animal polyploids. Proc Natl Acad Sci U S A 119(48):e2214070119. https://doi.org/10.1073/pnas.2214070119, URL https://www.ncbi.nlm.nih.gov/pubmed/36409908 Felber F (1991) Establishment of a tetraploid cytotype in a diploid population: Effect of relative fitness of the cytotypes. Journal of Evolutionary Biology 4(2):195–207. https://doi.org/10.1046/j.1420-9101.1991.4020195.x Felber F, Bever JD (1997) Effect of triploid fitness on the coexistence of diploids and tetraploids. Biological Journal of the Linnean Society 60(1):95–106.",
+    "id": 80
+  },
+  {
+    "text": "coexistence of diploids and tetraploids. Biological Journal of the Linnean Society 60(1):95–106. https: //doi.org/10.1111/j.1095-8312.1997.tb01485.x, URL https://doi.org/10.1111/j.10 95-8312.1997.tb01485.x Fisher RA (1937) The wave of advance of advantageous genes. Annals of Eugenics 7(4):355–369. https://doi.org/10.1111/j.1469-1809.1937.tb02153.x, URL https: //doi.org/10.1111/j.1469-1809.1937.tb02153.x 19875 876 877 878 879 880 881 882 883 884 885 886 887 888 889 890 891 892 893 894 895 896 897 898 899 900 901 902 903 904 905 906 907 908 909 910 911 912 913 914 915 916 917 918 919 920Gerstner BP, Wearing HJ, Whitney KD (2024) Why so many polyploids? Accounting for environmental stochasticity in unreduced gamete formation lowers the perceived barriers to polyploid establishment.",
+    "id": 81
+  },
+  {
+    "text": "stochasticity in unreduced gamete formation lowers the perceived barriers to polyploid establishment. Journal of Evolutionary Biology 37(3):325–335. https://doi.org/10.1093/jeb/voae016, URL https://academic.oup.com/jeb/article /37/3/325/7604013 Husband BC (2004) The role of triploid hybrids in the evolutionary dynamics of mixed-ploidy populations. Biological Journal of the Linnean Society 82(4):537–546. https://doi.org/10.1111/j.1095-8312.2004.00339.x, URL https://doi.org/10.1111/j. 1095-8312.2004.00339.x Kauai F, Mortier F, Milosavljevic S, et al (2023) Neutral processes underlying the macro eco-evolutionary dynamics of mixed-ploidy systems. Proc Biol Sci 290(1995):20222456.",
+    "id": 82
+  },
+  {
+    "text": "underlying the macro eco-evolutionary dynamics of mixed-ploidy systems. Proc Biol Sci 290(1995):20222456. https://doi.org/10.1098/rspb.2022.2456, URL https: //www.ncbi.nlm.nih.gov/pubmed/36946113 Kauai F, Bafort Q, Mortier F, et al (2024) Interspecific transfer of genetic informa- tion through polyploid bridges. Proceedings of the National Academy of Sciences 121(21):e2400018121. https://doi.org/10.1073/pnas.2400018121, URL https: //pnas.org/doi/10.1073/pnas.2400018121 Kauai F, Van de Peer Y, Bonte D (2025) Ecological opportunity and the onset of polyploid niche expansion waves.",
+    "id": 83
+  },
+  {
+    "text": "D (2025) Ecological opportunity and the onset of polyploid niche expansion waves. bioRxiv https://doi.org/10.1101/2025.07.11.664 136, URL https://www.biorxiv.org/content/early/2025/07/16/2025.07.11.664136 Kolmogorov AN, Petrovskii IG, Piskunov NS (1937) Study of the diffusion equation with growth of the quantity of matter and its application to a biological problem. Bulletin of Moscow State University, Series A: Mathematics and Mechanics 1(6):1– 25 Kreiner JM, Kron P, Husband BC (2017) Evolutionary Dynamics of Unreduced Gametes. Trends Genet 33(9):583–593. https://doi.org/10.1016/j.tig.2017.06.009, URL https://www.ncbi.nlm.nih.gov/pubmed/28732599 Kuznetsov IA (1998) Elements of applied bifurcation theory, 2nd edn. No.",
+    "id": 84
+  },
+  {
+    "text": "https://www.ncbi.nlm.nih.gov/pubmed/28732599 Kuznetsov IA (1998) Elements of applied bifurcation theory, 2nd edn. No. 112 in Applied mathematical sciences, Springer, New York Berlin Heidelberg Levin DA (1975) MINORITY CYTOTYPE EXCLUSION IN LOCAL PLANT POPULATIONS. Taxon 24:35–43 Lewis MA, Kareiva P (1993) Allee Dynamics and the Spread of Invading Organisms. Theoretical Population Biology 43(2):141–158. https://doi.org/10.1006/tpbi.1993. 1007, URL https://www.sciencedirect.com/science/article/pii/S0040580983710075 Li MM, Su QL, Zu JR, et al (2022) Triploid cultivars of Cymbidium act as a bridge in the formation of polyploid plants. Frontiers in Plant Science 13:1029915.",
+    "id": 85
+  },
+  {
+    "text": "bridge in the formation of polyploid plants. Frontiers in Plant Science 13:1029915. https: //doi.org/10.3389/fpls.2022.1029915, URL https://www.frontiersin.org/articles/1 20921 922 923 924 925 926 927 928 929 930 931 932 933 934 935 936 937 938 939 940 941 942 943 944 945 946 947 948 949 950 951 952 953 954 955 956 957 958 959 960 961 962 963 964 965 9660.3389/fpls.2022.1029915/full Kéfi S, Rietkerk M, Baalen Mv, et al (2007) Local facilitation, bistability and tran- sitions in arid ecosystems. Theoretical Population Biology 71(3):367–379. https: //doi.org/10.1016/j.tpb.2006.09.003, URL https://www.sciencedirect.com/scienc e/article/pii/S0040580906001250 Meirmans PG, Kolář F (2025) Whole-genome duplication leads to significant but inconsistent changes in climatic niche.",
+    "id": 86
+  },
+  {
+    "text": "(2025) Whole-genome duplication leads to significant but inconsistent changes in climatic niche. Proceedings of the National Academy of Sciences 122(24):e2424785122. https://doi.org/10.1073/pnas.2424785122, URL https://www.pnas.org/doi/abs/10.1073/pnas.2424785122 Mortier F, Bafort Q, Milosavljevic S, et al (2024) Understanding polyploid establish- ment: temporary persistence or stable coexistence? Oikos 2024(5):e09929. https: //doi.org/10.1111/oik.09929, URL https://nsojournals.onlinelibrary.wiley.com/do i/10.1111/oik.09929 Osterman WHA, Hagan JG, Whitton J, et al (2025) The ecology of polyploid establishment and exclusion, with implications for polyploid biogeography. New Phytologist 246(1):47–60.",
+    "id": 87
+  },
+  {
+    "text": "polyploid establishment and exclusion, with implications for polyploid biogeography. New Phytologist 246(1):47–60. https://doi.org/10.1111/nph.20451, URL https: //nph.onlinelibrary.wiley.com/doi/abs/10.1111/nph.20451 Otto SP, Whitton J (2000) POLYPLOID INCIDENCE AND EVOLUTION. Annual Review of Genetics 34(1):401–437. https://doi.org/10.1146/annurev.genet.34.1.401, URL https://doi.org/10.1146/annurev.genet.34.1.401 Ramsey J, Schemske DW (1998) PATHWAYS, MECHANISMS, AND RATES OF POLYPLOID FORMATION IN FLOWERING PLANTS. Annual Review of Ecol- ogy and Systematics 29(1):467–501.",
+    "id": 88
+  },
+  {
+    "text": "FORMATION IN FLOWERING PLANTS. Annual Review of Ecol- ogy and Systematics 29(1):467–501. https://doi.org/10.1146/annurev.ecolsys.29.1 .467, URL https://www.annualreviews.org/doi/abs/10.1146/annurev.ecolsys.29.1 .467 Spoelhof JP, Soltis DE, Soltis PS (2020) Habitat Shape Affects Polyploid Estab- lishment in a Spatial, Stochastic Model. Frontiers in Plant Science 11:592356. https://doi.org/10.3389/fpls.2020.592356, URL https://www.frontiersin.org/articl es/10.3389/fpls.2020.592356/full Van De Peer Y, Mizrachi E, Marchal K (2017) The evolutionary significance of poly- ploidy. Nature Reviews Genetics 18(7):411–424.",
+    "id": 89
+  },
+  {
+    "text": "K (2017) The evolutionary significance of poly- ploidy. Nature Reviews Genetics 18(7):411–424. https://doi.org/10.1038/nrg.2017 .26, URL https://www.nature.com/articles/nrg.2017.26 Van De Peer Y, Ashman TL, Soltis PS, et al (2021) Polyploidy: an evolutionary and ecological force in stressful times. The Plant Cell 33(1):11–26. https://doi.org/10.1 093/plcell/koaa015, URL https://academic.oup.com/plcell/article/33/1/11/6015 242 21967 968 969 970 971 972 973 974 975 976 977 978 979 980 981 982 983 984 985 986 987 988 989 990 991 992 993 994 995 996 997 998 999 1000 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011 1012Van Drunen WE, Friedman J (2022) Autopolyploid establishment depends on life-history strategy and the mating outcomes of clonal architecture. Evolution 76(9):1953–1970.",
+    "id": 90
+  },
+  {
+    "text": "on life-history strategy and the mating outcomes of clonal architecture. Evolution 76(9):1953–1970. https://doi.org/10.1111/evo.14582, URL https://onlinelibrary.wi ley.com/doi/abs/10.1111/evo.14582 Van Drunen WE, Husband BC (2019) Evolutionary associations between poly- ploidy, clonal reproduction, and perenniality in the angiosperms. New Phytologist 224(3):1266–1277. https://doi.org/10.1111/nph.15999, URL https://nph.onlinelibr ary.wiley.com/doi/10.1111/nph.15999 Volpert V, Petrovskii S (2009) Reaction–diffusion waves in biology. Physics of Life Reviews 6(4):267–310.",
+    "id": 91
+  },
+  {
+    "text": "Petrovskii S (2009) Reaction–diffusion waves in biology. Physics of Life Reviews 6(4):267–310. https://doi.org/10.1016/j.plrev.2009.10.002, URL https: //linkinghub.elsevier.com/retrieve/pii/S1571064509000347 Wang J, Li D, Shang F, et al (2017) High temperature-induced production of unre- duced pollen and its cytological effects in Populus. Scientific Reports 7(1):5281. https://doi.org/10.1038/s41598-017-05661-x, URL https://doi.org/10.1038/s415 98-017-05661-x Wood TE, Takebayashi N, Barker MS, et al (2009) The frequency of polyploid speciation in vascular plants. Proceedings of the National Academy of Sciences 106(33):13875–13879.",
+    "id": 92
+  },
+  {
+    "text": "speciation in vascular plants. Proceedings of the National Academy of Sciences 106(33):13875–13879. https://doi.org/10.1073/pnas.0811575106, URL https: //pnas.org/doi/full/10.1073/pnas.0811575106 Zwaenepoel A (2025) Autopolyploid establishment through polygenic adaptation. Evolution 79(9):1911–1922. https://doi.org/10.1093/evolut/qpaf124, URL https://doi.org/10.1093/evolut/qpaf124 22",
+    "id": 93
+  }
+]

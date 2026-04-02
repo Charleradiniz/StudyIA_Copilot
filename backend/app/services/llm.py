@@ -38,7 +38,7 @@ def generate_answer(question: str, context: str) -> str:
                 "model": MODEL,
                 "prompt": prompt,
                 "stream": False,
-                "temperature": 0.2  # 🔥 leve equilíbrio entre precisão e interpretação
+                "temperature": 0.2  # Slight balance between precision and interpretation
             },
             timeout=300
         )

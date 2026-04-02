@@ -1,38 +1,49 @@
 import re
-from typing import List
+from typing import List, Dict
 
 
+# =========================
+# TEXT CLEANUP
+# =========================
 def clean_text(text: str) -> str:
     """
-    Limpeza básica do texto extraído do PDF.
+    Basic cleanup for text extracted from the PDF.
     """
     text = text.replace("\n", " ")
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
 
+# =========================
+# SPLIT INTO SENTENCES
+# =========================
 def split_by_sentences(text: str) -> List[str]:
     """
-    Divide texto em frases de forma mais estável.
+    Split text into sentences in a stable way.
     """
     return re.split(r'(?<=[.!?])\s+', text)
 
 
+# =========================
+# CHUNKING FOR RAG
+# =========================
 def chunk_text(
     text: str,
+    doc_id: str,              # The doc_id is now required
     chunk_size: int = 800,
     overlap: int = 120
-) -> List[str]:
+) -> List[Dict]:
     """
-    Chunking robusto para RAG nível produção.
+    Robust chunking for production-grade RAG.
+    Each chunk carries doc_id for full traceability.
     """
 
     text = clean_text(text)
 
-    # 🔥 tentativa de split estrutural (caso PDF tenha headings)
+    # Structural split based on PDF paragraphs
     structural_splits = re.split(r'\n{2,}', text)
 
-    chunks = []
+    chunks: List[Dict] = []
 
     for block in structural_splits:
         block = block.strip()
@@ -48,30 +59,49 @@ def chunk_text(
             if not sentence:
                 continue
 
-            # 🔥 caso sentença seja absurda (PDF ruim)
+            # Very large sentence -> split directly
             if len(sentence) > chunk_size:
                 for i in range(0, len(sentence), chunk_size):
-                    chunks.append(sentence[i:i + chunk_size])
+                    chunks.append({
+                        "text": sentence[i:i + chunk_size],
+                        "doc_id": doc_id,
+                        "page": None,
+                        "bbox": None
+                    })
                 continue
 
-            # adiciona no chunk atual
+            # Accumulate into the current chunk
             if len(current_chunk) + len(sentence) <= chunk_size:
                 current_chunk += sentence + " "
             else:
-                # salva chunk atual
+                # Save the current chunk
                 if current_chunk.strip():
-                    chunks.append(current_chunk.strip())
+                    chunks.append({
+                        "text": current_chunk.strip(),
+                        "doc_id": doc_id,
+                        "page": None,
+                        "bbox": None
+                    })
 
-                # 🔥 overlap inteligente por palavras (não slicing bruto)
+                # Smart overlap
                 words = current_chunk.split()
                 overlap_words = words[-max(1, overlap // 10):]
 
                 current_chunk = " ".join(overlap_words) + " " + sentence + " "
 
+        # Save the last chunk from the block
         if current_chunk.strip():
-            chunks.append(current_chunk.strip())
+            chunks.append({
+                "text": current_chunk.strip(),
+                "doc_id": doc_id,
+                "page": None,
+                "bbox": None
+            })
 
-    # limpeza final (remove chunks minúsculos ruins)
-    chunks = [c.strip() for c in chunks if len(c.strip()) > 30]
+    # Filter out noise (very small chunks)
+    chunks = [
+        c for c in chunks
+        if len(c["text"].strip()) > 30
+    ]
 
     return chunks

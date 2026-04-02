@@ -1,0 +1,302 @@
+[
+  {
+    "text": "UNIVERSIDADE FEDERAL DO PARANÁ CHARLES VINICIUS DINIZ DA SILVA DINÂMICA ESPAÇO -TEMPORAL DO ESTOQUE VOLUMÉTRICO DE UMA FLORESTA NATIVA NO ESTADO DO PARANÁ CURITIBA 2018 CHARLES VINICIUS DINIZ DA SILVA DINÂMICA ESPAÇO -TEMPORAL DO ESTOQUE VOLUMÉTRICO DE UMA FLORESTA NATIVA NO ESTADO DO PARANÁ Trabalho de Conclusão de Curso apresentado ao Curso de Engenharia Florestal, Setor de Ciências Agrárias, Universidade Federal do Paraná, como requisito para a conclusão da disciplina ENGF010 e requisito parcial para a obtenção do título de Engenheira Florestal. Orientador: Prof. Dr. Allan Libanio Pelissari CURITIBA 2018 AGRADECIMENTO Ao curso de Engenharia Florestal do Setor de Ciências Agrárias da Universidade Federal do Paraná, pela formação técnica e profissional dispendida até o momento .",
+    "id": 0
+  },
+  {
+    "text": "do Paraná, pela formação técnica e profissional dispendida até o momento . Aos meus professores, que contribuíram com todo o embasamento técnico necessário para a realização deste tr abalho . À minha família, que em todo o momento me apoiou e incentivou , e em especial aos meus pais , que em todos os momentos estiveram presentes e ajudando no que fosse preciso . Aos meus amigos, em especial ao Felipe Kauai , Flávia Flores, Guilherme Farias, Cristiane Sater, André Araújo, Karen Diniz e Thais Krychijanoswki , por todo o companheirismo em momentos bons e ruins. E, principalmente, ao meu orientador Prof. Dr. Allan Libanio Pelissari, deixo meu muito obrigado, pela amizade , conversas e pela enorme paciência com a orientação deste trabalho.",
+    "id": 1
+  },
+  {
+    "text": "amizade , conversas e pela enorme paciência com a orientação deste trabalho. RESUMO A qualidade e a veracidade da informação são essencia is para o manejador executar o planejamento de suas atividades e predizer com a maior acuracidade possível a produção futura . No contexto das florestas nativas , existe uma dificuldade em trabalhar com ferramentas comu mente aplicadas nos plantios homogêneos , devido à alta diversidade de espécies das florestas naturais . A utilização de componentes espac iais no manejo é de grande importância na quantificação dos recursos, visando subsidiar o planejamento florestal de qualidade.",
+    "id": 2
+  },
+  {
+    "text": "importância na quantificação dos recursos, visando subsidiar o planejamento florestal de qualidade. Posto isso, o objetivo des te trabalho foi avaliar a regionalização espacial do estoque volumétrico de uma floresta nativa da tipologia Floresta Ombrófila Mista com modelagem geoestatística, visando propor subsídios para o manejo florestal direcionado aos núcleos de maior produção madeireira. Os dados foram obtidos de um inventário contínuo n a FLONA de Irati, em 400 unidades amostrais, onde equações volumétricas foram utilizadas para determinar o estoque volumétrico. Posteriormente, a análise geoestatística foi aplicada para a confecção de mapas temáticos por meio de interpolação por krigagem ordinária .",
+    "id": 3
+  },
+  {
+    "text": "confecção de mapas temáticos por meio de interpolação por krigagem ordinária . Os estoques volumétricos foram classificados espacialmente em áreas de baixo, médio e alt o volumes, visando a análise quanti tativa da dinâmica de área de cada classe ao longo do inventário contínuo . A variabilidade espacial do estoque volumétric o ocorre em pequenas escalas , sendo um comportamento intrínseco das florestas nativas. Além disso, a classe de maior volume apresentou crescimento em todas as ocasiões do inventário, mostrando que a floresta ainda não atingiu seu estado clímax.",
+    "id": 4
+  },
+  {
+    "text": "do inventário, mostrando que a floresta ainda não atingiu seu estado clímax. O crescimento dos núcleos de maior estoque se deu principalmente em áreas com grande diversidade de espécies, sendo essas , principalmente árvores secundárias iniciais e em locais com maior presença da Arauc aria angustif olia. Priorizar as operações em núcleos de maior estoque pode ser uma estratégia eficiente na alocação de recursos de ex ploração , para otimizar a produtividade da mão de obra e operações de extração . O manejo direcionado aos núcleos de maior estoque volumétrico pode também auxiliar na manutenção d a sustentabilidade do ecossistema e na redução dos impactos das operações na estrutura da floresta. Palavras -chave: Geoestatística , Krigagem ordinária , Manejo de precisão.",
+    "id": 5
+  },
+  {
+    "text": "da floresta. Palavras -chave: Geoestatística , Krigagem ordinária , Manejo de precisão. ABSTRACT The information’s quality and veracity are essential tools for the manager to carry out plans concerning forest activities and thereupon foretell with greater certainty future production. As far as tropical forests are concerned, there exists difficulties in working with tools generally employed in homogeneous plantations due to the high species diversity levels found in natural forests. The usage of spatial components into forest management planning is of the utmost importance as far as the quantification of resources is required, providing relevan t information to higher quality management planning.",
+    "id": 6
+  },
+  {
+    "text": "resources is required, providing relevan t information to higher quality management planning. Thus, th is present work aims at evaluating the performance of spatial regionalization of volume stocks in a natural mixed Atlantic forest (Floresta Ombrófila Mista) through geostatistical modelling, whic h may be of relevance as a generator of higher quality information to forest management through the identification of high wood productivity nuclei. The data used here come f rom a continuous forest inventory carried out at Irati’s National Forest (FLONA of Irati), wherein 400 sampling units were allotted , and volume equations have been used to determine wood volume stocks. Geostatistical analysis has been performed to mapping unmeasured regions through ordinary kriging.",
+    "id": 7
+  },
+  {
+    "text": "Geostatistical analysis has been performed to mapping unmeasured regions through ordinary kriging. Wood volume stocks were classified sp atially through areas of low, medium and high volumes, aiming at analyzing quantitatively the dynamic of wood volume classes in the area through time. The spatial variation of volume stocks occurs in small scales, which is an intrinsic behavior of natural tropical forests. Moreover, the high-volume class has shown growing activity at all times of forest measurements, which indicates that climax stage has not yet been achieved. The growth of higher volume nuclei was depicted at areas with higher levels of sp ecies diversity, wherein Araucaria angustifolia was present with greater density and species were mainly secondary successional.",
+    "id": 8
+  },
+  {
+    "text": "angustifolia was present with greater density and species were mainly secondary successional. Prioritizing operations at higher volume stocks nuclei may catalyze more efficiency at allocating resources to forest exploitat ion, optimizing work force productivity and exploitation operations. The forest management directed to higher volume nuclei may also assist the maintenance of ecosystem’s sustainability and the reduction of operational impacts in the forest’s structure. Keywords: Geostatistics, Ordinary kriging, Precision management. LISTA DE ILUSTRAÇÕES Figura 1 - Mapa de localização da área de estudo na FLONA de Irati, Paraná. ...... 15 Figura 2 - Distribuição dos valores de volume (m³ ha-1) para o remanescente de Floresta Ombrófila Mista. ................................",
+    "id": 9
+  },
+  {
+    "text": "de volume (m³ ha-1) para o remanescente de Floresta Ombrófila Mista. ................................ ................................ ......................... 17 Figura 3 - Modelos teóricos de semivariograma s ajustados para o remanescente de Floresta Ombrófila Mista . ................................ ................................ ......................... 18 Tabela 1 - Estatísticas descritivas d o estoque volumétrico estimada para o remanescente de Floresta Ombrófila Mista . ................................ ............................ 20 Tabela 2 - Parâmetros do semivariograma s ajustados para o estoque volumétrico do remanescente de Floresta Ombrófila Mista . ................................ ..............................",
+    "id": 10
+  },
+  {
+    "text": "o estoque volumétrico do remanescente de Floresta Ombrófila Mista . ................................ .............................. 1 Figura 4 - Semivariogramas ajustados para o estoque volumétrico do remanescente de Floresta Ombrófila Mista . ................................ ................................ .................... 22 Tabela 3 - Dinâmica de área das classes de estoque volumétrico para o remanescente de Floresta Ombrófila Mista . ................................ ................................ .................... 23 Figura 5 - Mapas temáticos de estoque volumétrico do remanescente de Floresta Ombrófila Mista . ................................ ................................ ................................ ......",
+    "id": 11
+  },
+  {
+    "text": "volumétrico do remanescente de Floresta Ombrófila Mista . ................................ ................................ ................................ ...... 24 Figura 6 - ANEXO - Mapas temáticos da taxa de mortalidade em uma Floresta Ombrófila Mista. ................................ ................................ ................................ ....... 32 Figura 7 - ANEXO - Mapas temáticos da área basal d o grupo das espécies secundárias iniciais em uma Floresta Ombrófila Mista. ................................ ........... 32 Figura 8 - ANEXO - Mapas temáticos do Índice de Shannon em uma Floresta Ombrófila Mista. ................................ ................................ ................................ .......",
+    "id": 12
+  },
+  {
+    "text": "Índice de Shannon em uma Floresta Ombrófila Mista. ................................ ................................ ................................ ....... 32 Figura 9 - ANEXO - Mapas temáticos d e área basal da espécie Araucaria angustifolia em uma Floresta Ombrófila Mista. ................................ ................................ ........... 32 Figura 10 - Dinâmica em percentual de área das classes de estoque volumétrico do remanescente de Floresta Ombrófila Mista . ................................ ............................. 26 SUMÁRIO 1 INTRODUÇÃO ................................ ................................ ................................ ........ 8 2 OBJETIVOS ................................ ................................ ................................",
+    "id": 13
+  },
+  {
+    "text": "1 INTRODUÇÃO ................................ ................................ ................................ ........ 8 2 OBJETIVOS ................................ ................................ ................................ .......... 10 2.1 OBJETIVO GERAL ................................ ................................ ......................... 10 2.2 OBJETIVOS ESPECÍFICOS ................................ ................................ ........... 10 3 REVISÃO DE LITERATURA ................................ ................................ ................ 11 3.1 FLORESTA OMBRÓFILA MISTA ................................ ................................ ... 11 3.2 GEOESTATÍSTICA ................................ ................................ .........................",
+    "id": 14
+  },
+  {
+    "text": "FLORESTA OMBRÓFILA MISTA ................................ ................................ ... 11 3.2 GEOESTATÍSTICA ................................ ................................ ......................... 12 4 MATERIAL E MÉTODOS ................................ ................................ ..................... 14 4.1 ÁREA DE ESTUDO ................................ ................................ ........................ 14 4.2 ESTIMATIVA DE VARIÁVEIS DENDROMÉTRICAS ................................ ...... 16 4.3 MODELAGEM GEOESTATÍSTICA DO ESTOQUE VOLUMÉTRICO ............. 16 5 RESULTADOS E DISCUSSÃO ................................ ................................ ............ 20 6 CONCLUSÕES ................................ ................................",
+    "id": 15
+  },
+  {
+    "text": "5 RESULTADOS E DISCUSSÃO ................................ ................................ ............ 20 6 CONCLUSÕES ................................ ................................ ................................ ..... 27 REFERÊNCIAS ................................ ................................ ................................ ....... 28 ANEXOS ................................ ................................ ................................ ..................",
+    "id": 16
+  },
+  {
+    "text": "27 REFERÊNCIAS ................................ ................................ ................................ ....... 28 ANEXOS ................................ ................................ ................................ .................. 33 8 1 INTRODUÇÃO Sendo a definição oficial de florestas, segundo a FAO, uma área maior que meio hectare, com árvores maiores que cinco metros e cobertura de dossel com mais de 10% da área, ou que contenham árvores que tenham o potencial para chegar a tal, desde que não sejam áreas com cobertura predominantemente urbana ou de produção agrícola (FAO, 201 2).",
+    "id": 17
+  },
+  {
+    "text": "áreas com cobertura predominantemente urbana ou de produção agrícola (FAO, 201 2). As florestas nativas constituem um ecossistema complexo, envolvendo múltiplas espécies vegetais, além da interação com a faun a e os componentes inanimados, onde , segundo Leite ( 1994 ), a diversidade de espécies arbóreas em florestas nativas, como no caso da Floresta Ombrófila Mista , é superior a 350 espécies . A diversidade de espécies é um argumento importante para sustentar o m anejo de florestas nativas, visto que é um fator que influencia a produção de madeira nessas florestas, quando a diversidade é avaliad a isoladamente (VILÀ, 2003). Geralmente, quando há maior número de espécies arbóreas, existe uma influência positiva na produção de madeira (ERSKINE, 2006).",
+    "id": 18
+  },
+  {
+    "text": "espécies arbóreas, existe uma influência positiva na produção de madeira (ERSKINE, 2006). A qualidade e a veracidade da informação é essencial para o ser humano executar o planejamento de suas atividades e predizer com a maior acuracidade possível a produção futura, além de trabalhar com a sustentabilidade do s recursos naturais que, por mais que sejam renováveis, podem se esgotar em caso de um manejo mal executado, se valendo de informações imprecisas e de qualidade duvidosa , pois o planejamento tático é uma etapa fundamental da atividade florestal, onde se de ve levar em consideração quando, onde e como realizar a colheita de madeira ( WEINTRAUB et al ., 1994 ).",
+    "id": 19
+  },
+  {
+    "text": "realizar a colheita de madeira ( WEINTRAUB et al ., 1994 ). A diversidade de espécies e de idade das árvores confere a floresta nativa premissas de análise completamente diferenciadas de um povoamento com espaçamento pré -definido, equiâneo e homogêneo , tendo a primeira , núcleos de maior produção em áreas com condições mais adequadas e com diferentes combinações de componentes bióticos e abióticos do ecossistema, sendo as áreas totalmente heterogêneas . Isso d ificulta a aplicação de técnicas utilizad as para plantações florestais, pois essa complexidade de fatores que influenciam a produção de florestas nativas pode impedir a modelagem de equações e utilização de técnicas ideais para plantações florestais, principalmente nos trópicos (VANCLAY, 1994).",
+    "id": 20
+  },
+  {
+    "text": "utilização de técnicas ideais para plantações florestais, principalmente nos trópicos (VANCLAY, 1994). 9 A estatística univariada e não espacial possui uma dificuldade em explicar eventos espacialmente distribuídos, havendo a necessidade de se trabalhar com os caracteres espaciais das distribuições (MATHERON, 1963 ). Nesse contexto, entende -se que trabalhar com valores médios e coeficientes de variação, assim como outros componentes de estatística paramétrica, podem ser insuficientes para subsidiar um manejo florestal de qualidade, que mantenha a sustentabilidade no sistema e não traga prejuízo para o correto funcionamento do ecossistema e nem prejudique a biodiversidade.",
+    "id": 21
+  },
+  {
+    "text": "prejuízo para o correto funcionamento do ecossistema e nem prejudique a biodiversidade. Assim, a variabilidade espacial é um componente importante para se trabalhar em florestas nativas, porque considera a componente geográfica na aná lise, permitindo que se faça um planejamento das atividades com o direcionamento para núcleos de maior estoque do produto desejado . Além do mais, possibilita que as regiões que tenham um crescimento mais lento, tenham maior tempo para incrementar seu estoque e garantir a maximiza ção d a produção por unidade de área .",
+    "id": 22
+  },
+  {
+    "text": "garantir a maximiza ção d a produção por unidade de área . A geoestatistica é uma das ferramentas de interpolação que permite a utilização da variabilidade espacial, se valendo da influência espacial de uma variável em relação a distância entre uni dades amostrais em diferentes direções, fazendo com que se utilize mapas com alta precisão de localização das diferenças de valores associados às variáveis de interesse. Com isso, t rabalhar com variáveis regionalizadas visa compreender especificamente o co mponente espacial de um fenômeno (MATHERON, 1963) , com vastas possibilidades de aplicação ao manejo de florestas nativas .",
+    "id": 23
+  },
+  {
+    "text": ", com vastas possibilidades de aplicação ao manejo de florestas nativas . 10 2 OBJETIVO S 2.1 OBJETIVO GERAL O objetivo deste trabalho foi avaliar a distribuição espacial d e classes de estoque volumétrico de uma floresta nativa da tipologia Floresta Ombrófila Mista com uma ferramenta geoestatística, visando propor subsídios para o manejo florestal direcionado aos núcleos de maior produção madeireira. 2.2 OBJETIVOS ESPECÍFICOS a) Comparar a dinâmica espacial e temporal em área relativa entre as classes de estoque volumétrico ; e b) Avaliar a regionalização da variável estoque volumétrico e inferir sobre os fatores de maior influência em sua dinâmica espacial e temporal .",
+    "id": 24
+  },
+  {
+    "text": "os fatores de maior influência em sua dinâmica espacial e temporal . 11 3 REVISÃO DE LITERATURA 3.1 FLORESTA OMBRÓFILA MISTA A definição de Floresta Ombrófila Mista (FOM) consiste, a partir da etimologia do nome Ombrófila, na união de duas palavras gregas, “ombrós”, que significa chuva , e “phílos”, com o sentido de “amigo”, adicionado d e “Mista”, pela comparência tanto de árvores folhosas como coníferas. Pela presença característica da espécie Araucaria angustifolia (Bertol.) Kuntze, também é conhecida como “mata -de- araucária”. Sua extensão original era, em sua maioria , no Planalto Merid ional, tendo uma grande redução em área por conta do desmatamento.",
+    "id": 25
+  },
+  {
+    "text": "Merid ional, tendo uma grande redução em área por conta do desmatamento. A Floresta Ombrófila Mista também é classificada como uma ecorregião, denominada “Florestas de Araucária”, pela WWF, onde existe uma dificuldade em definir um limite com a ecorregião “Flor estas do Alto Paraná”, sendo a primeira comumente atribuída à altitudes superiores a 700 a 900 m ao nível do mar e com a ocorrência da araucária, podocarpos e outras espécies associadas (BITETTI, PLACCI e DIETZ, 2003). No entanto, segundo Roderjan et al. ( 2002), essa floresta se encontra entre 800 e 1.200 m sobre o nível do mar , podendo eventualmente ocorrer acima desses limites. O clima frequente nessa floresta é quente e úmido, com inverno geralmente frio.",
+    "id": 26
+  },
+  {
+    "text": "clima frequente nessa floresta é quente e úmido, com inverno geralmente frio. Segundo o Instituto Brasileiro de Geografia e Es tatística (IBGE, 20 12), são identificadas quatro formações da Floresta Ombrófila Mista: aluvial (em terraços antigos associados à rede hidrográfica), submontana (constituído disjunções em altitudes inferiores a 400 m), montana (situada aproximadamente entre 400 e 1 .000 m de altitude) e alto -montana (compreendendo as altitudes superiores a 1 .000 m). As florestas possuem a conversão de área para agricultura, pastagens e urbanização como os principais fatores de redução de suas cobertura s. Segundo Grez et al. (1998), a conversão da floresta para outros usos acarreta na fragmentação em um grande número de blocos florestais de menor expressão.",
+    "id": 27
+  },
+  {
+    "text": "na fragmentação em um grande número de blocos florestais de menor expressão. De acordo com Gilpin (1987 ), quanto menor o fragmento, mais as populações tendem a estar vulneráveis a extinção, pelos riscos ambientais, genéticos ou demográficos. O abandono de áreas advindas de agricultura e pecuária , pela sua degradação e perda de produtividade para essas atividades , ocorre com grande frequência. Em defluência ao abandono, inicia -se a regeneração, sucessão e a cobertura vegetal, 12 que, por falta de manejo de qualquer natureza, estagnará por inúmeros fatores, tais como a intensidade e a frequência de luz, a distância de p orta-sementes , entre outros (ROSOT, 2007). Percebe -se então a influência positiva que a intervenção humana pode ter nas florestas.",
+    "id": 28
+  },
+  {
+    "text": "então a influência positiva que a intervenção humana pode ter nas florestas. No entanto, deve -se diferenciar os conceitos de intervenção nas florestas. A exploração florestal consiste na simples utilização de produtos florestais, em sua forma convencional, sem qualquer planejamento de impacto, maquinário e mão de obra.",
+    "id": 29
+  },
+  {
+    "text": "forma convencional, sem qualquer planejamento de impacto, maquinário e mão de obra. O manejo florestal possui muitas definições, sendo a utilizada no Código Florestal Brasileiro uma das mais modernas regida pela Le i nº 12.651, de 25 de maio de 2012 (BRASIL, 2012): Manejo sustentável: administração da vegetação natural para a obtenção de benefícios econômicos, sociais e ambientais, respeitando -se os mecanismos de sustentação do ecossistema objeto do manejo e conside rando -se, cumulativa ou alternativamente, a utilização de múltiplas espécies madeireiras ou não, de múltiplos produtos e subprodutos da flora, bem como a utilização de outros bens e serviços .",
+    "id": 30
+  },
+  {
+    "text": "da flora, bem como a utilização de outros bens e serviços . Tendo esse contraste entre as definições, entende -se por manejo sustentável como a forma correta de trabalhar as florestas, pois, para cumprir esses objetivos, deve -se ter uma boa compreensão dos recursos florestais e subsídios para um bom planejamento da intervenção na floresta, de modo que essa tenha o impacto reduz ido, ou ainda, que haja a melhora na qualidade do ecossistema. 3.2 GEOESTATÍSTICA A geoestatística consiste em uma ferramenta que permite avaliar espacialmente o comportamento da floresta e se vale da teoria que as amostras próximas têm uma maior similaridade entre si em valores de distância menores do que em valores maiores no espaço ou no tempo ( ISAAKS et al. , 1989).",
+    "id": 31
+  },
+  {
+    "text": "maiores no espaço ou no tempo ( ISAAKS et al. , 1989). Essa ferramenta é muito aplicada na ciência do solo, porém utiliza -se também em outras ciências, como a ciência florestal. Matérn (1960) e Osborne (1942), desenvolveram os primeiros trabalhos de variação espacial que envolveram classificações de vegetação . O uso da krigagem na geoestatística permite a obtenção 13 de valores em locais não amostrados. Por meio de um estudo realizado por Kanegae et al. (2007), foi possível avaliar a diferença na utilização da krigagem em relação a outro método de interpolação de valores em plantios clonais de Eucalyptus sp. Estudos também foram re alizados na regionalização de biomassa, como por Sales et al.",
+    "id": 32
+  },
+  {
+    "text": "foram re alizados na regionalização de biomassa, como por Sales et al. (2007), em que foi utilizada a krigagem para estimar volume na floresta amazônica e, posteriormente , também a biomassa. Roveda et al. (2018) aplicaram a geoestatística para avaliar as relações e spaciais entre atributos do solo e a variáveis florestais de uma Floresta Ombrófila Mista , onde a variável que apresentou a melhor relação com a densidade de indivíduos e a área basal foi o pH do solo . Pelissari et al. (2017) trabalharam com a dinâmica da área basal para grupos sucessionais de espécies arbóreas com interpolação por krigagem ordinária , mostrando que a distribuição é heterogênea e possui dependência espacial . A avaliação espacial da diversidade de espécies e riqueza no Cerr ado foi feita por Batista et al.",
+    "id": 33
+  },
+  {
+    "text": "espécies e riqueza no Cerr ado foi feita por Batista et al. (2016) também por krigagem ordinária , onde existe uma estabilidade quanto à diversidade e riqueza . Os teores de carbono e biomassa da serapilheira foram avaliados no Cerrado por Morais et al. (2017), mostrando que o teor de carbono possui uma alta dependência da estrutura espacial. Scolforo et al. (2016) apresenta ram um trabalho para avaliação de teor de carbono no bioma Cerrado e Mata Atlântica, visando determinar qual seria o melhor estimador espacial, concluindo que a kri gagem dos resíduos foi a melhor estimador e mostrando que essa variável é espacialmente estruturada.",
+    "id": 34
+  },
+  {
+    "text": "foi a melhor estimador e mostrando que essa variável é espacialmente estruturada. 14 4 MATERIAL E MÉTODOS 4.1 ÁREA DE ESTUDO Os dados utilizados para a realização deste trabalho são provenientes de um inventário contínuo dos recursos quantitativos e qualitativos de um remanescente de Floresta Ombrófila Mista, em um intervalo temporal de 3 anos entre cada avaliação, entre 2002 e 2014, em que 25 unidades amostrais de 100 m x 100 m, organizadas em 16 subunidades de 25 m x 25 m e georreferenciadas, tiveram suas árvores com diâmetro à altura do peito (d) igual ou superior a 10 cm mensuradas. A FLONA de Irati, criada pela Portaria 559 de 25/10/1968 (BRANDALISE et al.",
+    "id": 35
+  },
+  {
+    "text": "FLONA de Irati, criada pela Portaria 559 de 25/10/1968 (BRANDALISE et al. , 2013) , onde foram instaladas as parcelas, se encontra entre os municípios de Fernandes Pinheiro, Teixeira Soares, Imbituva e Irati, no estado do Paraná, delimitada pelas coordenadas ( -50.602004, -25.418562) e ( -50.513306, -25.306067) em uma área total de 3 .802,5 0 ha, sendo 63,9% dentro do município de Fernandes Pinheiro, conforme apontado na Figura 1. A região apresenta clima Cfb, segundo a classificação de Köppen, que representa a inexistência de uma estação seca e a exis tência de verão temperado, com precipitação superior a 1.300 mm ao ano e temperatura média anual em torno de 16°C a 18°C (ALVARES et al., 2013). 15 Figura 1 - Mapa de localização da área de estudo na FLONA de Irati , Paraná.",
+    "id": 36
+  },
+  {
+    "text": "de localização da área de estudo na FLONA de Irati , Paraná. Fonte: O autor (2018) . 16 4.2 ESTIMATIVA DE VARIÁVEIS DENDROMÉTRICAS A variável altura é de difícil obtenção em Florestas Naturais, com isso buscou - se na literatura equações hipsométricas já ajustadas para uma região próxima e com características similares. Como há uma diferença grand e nas características da araucária com árvores folhosas, optou -se por utilizar uma equação ajustada (1) especificamente para araucárias e uma equação genérica (2) para outras espécies (CORTE et al., 2013) . ℎ=−2,11355 +5,660768 .𝑙𝑛(𝑑) (1) ℎ=15,84375 −36,98531 𝑑+0,1346 .𝑑 (2) Em que : h = altura total (m); e d = diâmetro à altura do peito a 1,3 m de altura do solo (cm).",
+    "id": 37
+  },
+  {
+    "text": "à altura do peito a 1,3 m de altura do solo (cm). Quanto à estimativa de volume, também foram utilizadas equações ajustadas na literatura para regiões próximas, tendo uma equação específica (3) para araucárias (SIQUEIRA, 1977) e uma equação geral (4) para outras espécies (CUNHA, 1978), buscando estimativa s mais consistentes : 𝑣=(−0,000157 +0,0379431 𝑑ℎ+ 0,000049 𝑑)𝑑ℎ (3) 𝑣= 𝑒0,15495𝑑2,14581ℎ0,71915 (4) Em que: v = volume (m³); h = altura total (m); e d = diâmetro à altura do peito a 1,3 m de altura do solo (cm).",
+    "id": 38
+  },
+  {
+    "text": "à altura do peito a 1,3 m de altura do solo (cm). 4.3 MODELAGEM GEOESTATÍSTICA DO ESTOQUE VOLUMÉTRICO Os dados foram regionalizados por meio da krigagem ordinária, para determinação de valores em qualquer lugar da área de estudo, sendo importante a utilização des sa metodologia para a determinação das distâncias entre as estimativas. A fórmula da krigagem ordinária é dada por (5) : 17 𝑍𝐾𝑂∗= ∑𝜆[𝑍(𝑥𝑖)]𝑛 𝑖=1 (5) Em que : 𝑍𝐾𝑂∗ = valor estimado da variável 𝑥 em um determinado ponto via krigagem ordinária ; 𝜆 = ponderação associada aos dados ; e 𝑍(𝑥𝑖)= valor da variável 𝑥 em uma unidade amostral mensurada. Devido a distribuição assimétrica à direita dos dados (Figura 2), foi necessária uma transformação logarítmica para melhorar a modelagem dos semivariogramas .",
+    "id": 39
+  },
+  {
+    "text": "foi necessária uma transformação logarítmica para melhorar a modelagem dos semivariogramas . No entanto, não foi feito qualquer tratamento de outliers . Em seguida, foram calculadas as semivariâncias direcionais (0º, 45º, 90º e 135º), para então obter os semivariograma s médio s, considerando a anisotropia das variações espaciais. Posteriormente , os modelos teóricos Esférico, Exponencial e Gaussiano (Figura 3) foram ajustados para cada ocasião do inventário com o software GS+, buscando os modelos que melhor se ajustam para cada conjunto de dados, com base no maior coeficiente de determinação (R²) e na menor soma de quadrados dos erros (SQE). Figura 2 - Distribuição dos valores de volume (m³ ha-1) para o remanescente de Floresta Ombrófila Mista. Fonte: O autor (2018).",
+    "id": 40
+  },
+  {
+    "text": "ha-1) para o remanescente de Floresta Ombrófila Mista. Fonte: O autor (2018). As matrizes de krigagem ordinária foram geradas com intervalos uniformes de 18 5 m x 5 m, em ambos os eixos da estimativa. A matriz foi exportada para formato raster , com o objetivo de facilitar a classificação de estoque volumétrico. Então, foi criada uma rotina para o cálculo das áreas referentes a cada classe, na linguagem de programação Python, com o auxílio do software ArcGIS, onde os rasters tiveram os seus valores reclassificados em classes, convertid os para polígonos vetoriais e, posteriormente, os valores de suas respectivas áreas exportados para planilhas digitais.",
+    "id": 41
+  },
+  {
+    "text": "e, posteriormente, os valores de suas respectivas áreas exportados para planilhas digitais. Figura 3 - Modelos teóricos de semivariograma s ajustados para o remanescente de Floresta Ombrófila Mista , em que: 𝛾(h) = semivariâncias, h = distância (m); 𝐶0 = efeito pepita; 𝐶1= contribuição; e 𝑎 = alcance (m). Fonte: Camargo (1998) . As classes de estoque volumétrico foram definidas pela utilização do primeiro quartil da distribuição dos dados de volume por hectare como limite superior da classe 1, representando as áreas com baixo estoque. O terceiro quartil foi utilizado como limite inferior da classe 3, caracterizando as áreas de alto volum e, deixando o limite superior aberto, enquanto os valores intermediários foram associados à classe 2.",
+    "id": 42
+  },
+  {
+    "text": "limite superior aberto, enquanto os valores intermediários foram associados à classe 2.  Classe 1 (Valor mínimo – 200 m³ ha-1)  Classe 2 (200 m³ ha-1 – 400 m³ ha -1)  Classe 3 (400 m³ ha-1 – Valor máximo) A expressividade de cada classe foi calculada pela fórmula (6): 19 𝐶=100 (𝐴𝑐) 𝐴𝑡 (6) Em que : 𝐶 = expressividade da classe em relação a área total (%); 𝐴𝑐 = área estimada de valores contidos dentro da classe (ha); e 𝐴𝑡 = área total da área inventariada (ha). Posteriormente, foi calculada a dinâmica dos núcleos de cada classe em relação à avaliação anterior pela fórmula (7): 𝐷=100 (𝐴𝑖−𝐴𝑖−1) 𝐴𝑖 (7) Em que : 𝐷 = dinâmica da área (%) ; 𝐴𝑖 = área (ha) na avaliação i; e 𝐴𝑖−1 = área (ha) na avaliação anterior .",
+    "id": 43
+  },
+  {
+    "text": "na avaliação i; e 𝐴𝑖−1 = área (ha) na avaliação anterior . 20 5 RESULTADOS E DISCUSSÃO A Tabela 1 apresenta os valores médios de estoque volumétrico por hectare (𝑉̅) e o coeficiente de variação (𝑐𝑣%) em cada ocasião do inventário contínuo . Esses resultados possibilitam observar aumento dos valores médios e estabilidade da variabilidade, porém não permitem identificar a variabilidade espacial. Logo, a estatística descritiva não é suficiente para descrever a dinâmica em estoque volumétrico de uma floresta nat iva, visto que é um ambiente influenciado por inúmeras variáveis, que possui uma grande influência sobre o crescimento e dispersão da flora e fauna (RODERJAN, 2002) . Tabela 1 - Estatísticas descritivas d o estoque volumétrico estimada para o remanescente de Floresta Ombrófila Mista .",
+    "id": 44
+  },
+  {
+    "text": "o estoque volumétrico estimada para o remanescente de Floresta Ombrófila Mista . Estoque Volumétrico 2002 2005 2008 2011 2014 𝑉̅ (m³ ha-1) 309,7867 336,9091 342,8462 349,7995 362,0256 𝑐𝑣% 35 37 36 37 37 Em que: 𝑉̅ = média do estoque volumétrico; e 𝑐𝑣% = coeficiente de variação. Desconsiderar a correlação espacial pode significar negligenciar a expressão dessas variáveis atuando em suas múltiplas combinações , porque a variação não é distribuída de forma homogênea ao longo das áreas, tendo regiões com maior ou menor variação do est oque volumétrico.",
+    "id": 45
+  },
+  {
+    "text": "áreas, tendo regiões com maior ou menor variação do est oque volumétrico. Os resultados obtidos apenas pela estatística univariada podem ser inconclusivos ou trazer conclusões errôneas, que podem prejudicar todo o contexto de sustentabilidade de um manejo florestal, principalmente ao se considerar um ambiente com grande diversidade, como a Floresta Ombrófila Mista, onde segundo Reis (1995) só no estado do Paraná, estima -se a existência mais de 200 espécies, com alto endemismo (40%) .",
+    "id": 46
+  },
+  {
+    "text": "-se a existência mais de 200 espécies, com alto endemismo (40%) . Nesse contexto, a geoestatística se mostra como uma importante ferramenta para solucionar esses problemas, pois considera, além da correlação espacial propriamente dita, a anisotropia da variabilidade espacial em diferentes angulações , onde é percebida pela utilização dos semivariogramas de diferentes direções (CAMARGO, 1998) . A Tabela 2 apresenta os parâmetros para a composição do semivariograma 21 isotrópico , que é a forma de proceder em caso dos semivariogramas direcionais serem semelhantes (CAMARGO, 2001 ). O efeito pepita alto representa que a variabilidade espacial ocorre em peque na escala, pelo comportamento natural das florestas nativas de grande heterogeneidade.",
+    "id": 47
+  },
+  {
+    "text": "peque na escala, pelo comportamento natural das florestas nativas de grande heterogeneidade. Tabela 2 - Parâmetros do semivariograma s ajustados para o estoque volumétrico do remanescente de Floresta Ombrófila Mista . Parâmetros 2002 2005 2008 2011 2014 𝐶0 0.09 0.1 0.1 0.1 0.12 𝐶1 0.135 0.15 0.15 0.15 0.16 𝑎 100 100 110 90 90 R² 0.939 0.933 0.923 0.915 0.89 SQE 1,067 10-4 1,375 10-4 1,646 10-4 2,523 10-4 1,297 10-4 Modelo selecionado Gaussiano Gaussiano Gaussiano Gaussiano Gaussiano Transformação Log Log Log Log Log Em que: 𝐶0 = efeito pepita; 𝐶1= contribuição; 𝑎 = alcance (m); R² = coeficiente de determinação; e SQE = soma de quadrados dos erros .",
+    "id": 48
+  },
+  {
+    "text": "coeficiente de determinação; e SQE = soma de quadrados dos erros . O alcance dos semivariogramas (𝑎) foi bem estável, com um valor médio de 100 m, variando de 90 a 110 m, indicando que essa é a máxima distância em que , segundo Vieira (2000) duas unidades amostrais estão espacialmente correlacionadas . Logo, pode se afirmar que a utilização do alcance para determinar a distância das parcelas no campo é válida, otimizando a a locação das unidades amostrais e reduzindo os custos de inventário. Os semivariogramas se mostraram bem ajustados, com o coeficiente de determinação (R²) próximo a 0,9 em tod as as ocasiões do inventário contínuo.",
+    "id": 49
+  },
+  {
+    "text": "(R²) próximo a 0,9 em tod as as ocasiões do inventário contínuo. Isso indica que existe uma forte associação das diferenças de estoque volumétrico entre unidades amostrais separadas por sucessivas distâncias, visto que quanto mais próximo de 1, maior é a relação existente, independentemente do sinal da diferença de volume ou da direção no espaço (TAYLOR, 1990) . Devido ao diferente ritmo de crescimento das árvores, é de se esperar que o coeficiente de determinação (R²) reduza ao longo do tempo, ao passo que o efeito pepita (𝐶0) e a contribuição (𝐶1) aumentem, pois, cada vez mais os fatores de influência da variabilidade terão expressividade maior.",
+    "id": 50
+  },
+  {
+    "text": "cada vez mais os fatores de influência da variabilidade terão expressividade maior. Todos os semivariogramas se 22 ajustaram melhor ao modelo gaussiano, devido ao alto valor de efeito pepita, que conferiu a característica sigmoidal da curva da s semivariâncias dos dados (Figura 4) . A transformação logarítmica foi essencial para a construção dos semivariogramas, visto que o efeito do viés da distribuição foi neutralizado e os pontos discrepantes se tornaram inexpressivos. Figura 4 - Semivariogramas ajustados para o estoque volumétrico do remanescente de Floresta Ombrófila Mista , em que : (A) 2002; (B) 2005; (C) 2008; (D) 2011; e (E) 2014.",
+    "id": 51
+  },
+  {
+    "text": ": (A) 2002; (B) 2005; (C) 2008; (D) 2011; e (E) 2014. Os semivariogramas bem ajustados e valores estabilizados dos parâmetros permitem a avaliação temporal dos mapas de krigagem, bem como compreender a dinâmica espacial das classes de estoque volumétrico. As classes representaram uma variação expressiva nas diferentes ocasiões do inventário, mostrando que a floresta ainda está em crescimento e não apresenta sinais de estabilização 23 volumétrica, como mostra a Tabela 3. Tabela 3 - Dinâmica de área das classes de estoque volumétrico para o remanescente de Floresta Ombrófila Mista .",
+    "id": 52
+  },
+  {
+    "text": "classes de estoque volumétrico para o remanescente de Floresta Ombrófila Mista . Classe 2002 -2005 2005 -2008 2008 -2011 2011 -2014 1 -6,45% -11,11% -51,99% -2.485,99% 2 -9,65% -2,44% -2,95% -5,92% 3 79,52% 18,88% 22,44% 29,65% É notável que a classe 1 perdeu grande parte de sua área em todas as ocasiões, tendo uma redução cada vez mais expressiva, quase que extinguindo a classe do mapa de avaliação de 2014. A classe 2 também teve uma redução de área em todas as ocasiões, no entanto, como originalmente possuía uma elevada porcentagem de área, continuou com uma grande expressividade. A classe 3, por outro lado, é a única classe que apresentou crescimento em todos os anos, o que reforça que a floresta está em pleno crescimento.",
+    "id": 53
+  },
+  {
+    "text": "os anos, o que reforça que a floresta está em pleno crescimento. Na Figura 5 são apresentados os mapas de krigagem ordinária, representando espacialmente as classes de estoque volumétrico. Na seção esquerda, delimitada pelos pares de coordenadas cartesianas nos pontos (x, y) : (13, 160) e (150, 488), observa -se que, até 2011, existe uma grande porcentagem da área ocupada pela classe 1, o que, compara ndo com o mapa de mortalidade , na Figura 6-Anexo , da mesma região (PELISSARI et al. , 2018 ), indica que existe uma grande substituição das árvores, que são predominantemente pioneiras , como mostra a Figura 7 -Anexo (PELISSARI et al. , 2017 ). A partir de 2014, a área em questão começa a s er predominantemente enquadrada na classe 2.",
+    "id": 54
+  },
+  {
+    "text": "área em questão começa a s er predominantemente enquadrada na classe 2. Um dos fatores que explica essa substituição é o aumento da diversidade de espécies que ocorrem na região, indicado pelo índice de Shannon , demonstrado na Figura 8 -Anexo (PELISSARI et al. , 2018) . 24 Figura 5 - Mapas temáticos de estoque volumétrico do remanescente de Floresta Ombrófila Mista , em que : (A) 2002; (B) 2005; (C) 2008; (D) 2011; e (E) 2014. 25 Na seção delimitada pel os pares de coordenadas (431, 13) a (640, 160), nota - se que a área era coberta predominantemente pela classe 2, sendo progressivamente substituída pela classe 3.",
+    "id": 55
+  },
+  {
+    "text": "era coberta predominantemente pela classe 2, sendo progressivamente substituída pela classe 3. Em oposição à seção discutida no parágrafo anterior, essa possui a diversidade de espécies crescente ao lo ngo dos anos, com baixas taxas de mortalidade e com a grande maioria das espécies pertencentes ao estágio sucessional secundárias iniciais. Em acordo com a seção anterior, a seção compreendida entre os pares de coordenadas (1.548,13) e (1 .688, 320) também possui a substituição da classe 2 pela classe 3, entretanto , essa área apresentou uma elevada mortalidade no período de 2002 a 2008 (Figura 6A -Anexo) . No entanto, isso pode ser parcialmente explicado pela substituição de grandes núcleos de espécies pioneiras por predominância de secundárias iniciais (Figura 7 -Anexo ).",
+    "id": 56
+  },
+  {
+    "text": "de espécies pioneiras por predominância de secundárias iniciais (Figura 7 -Anexo ). Outro fator que possui uma influência expressiva sobre esse resultado é o aumento de núcleos espaciais de grande diversidade arbórea nessa seção (Figura 8 -Anexo) . Analisando a evolução dos núcleos de estoque volumétrico da classe 3, nota - se que são áreas majoritariamente composta por araucárias , comparando com a Figura 9-Anexo (PELISSARI et al. , 2018), e que possuem alta diversidade de espécies (Figura 8 -Anexo) , sen do es sas principalmente secundárias tardias (Figura 7-Anexo) .",
+    "id": 57
+  },
+  {
+    "text": "-Anexo) , sen do es sas principalmente secundárias tardias (Figura 7-Anexo) . Com isso, e sses resultados reforçam o argumento de que os componentes de variação espacial influenciam diretamente na avaliação do estoque volumétrico de uma floresta nativa e considerar apenas a estatística descritiva é insuficiente para avaliar a dinâmica do estoque volumétrico . Na Figura 10, apresenta -se a dinâmica em percentual de área dos núcleos de estoque volumétrico, onde nota -se que a classe 2 reduz iu a sua expressividade progressivament e, assim como a classe 1, que teve seu volume reduzido para valores ínfimos , sendo substituídas pela classe 3. 26 Figura 10 - Dinâmica em percentual de área das classes de estoque volumétrico do remanescente de Floresta Ombrófila Mista .",
+    "id": 58
+  },
+  {
+    "text": "das classes de estoque volumétrico do remanescente de Floresta Ombrófila Mista . Com essas informações, percebe -se que o manejo pode ser focado em núcleos de maior estoque volumétrico. Isso deve -se a uma questão de produtividade da mão de obra, que normalmente possui um rendimento baixo em florestas nativas em relação às plantadas, dev ido ao tempo dispendido para a localização dos indivíduos a serem removidos, além da dificuldade de mecanização da operação. Logo, priorizar as operações em núcleos de maior estoque pode ser uma estratégia eficiente na alocação de recursos de extração. Ademais, os núcleos possuem forte influência da presença de indivíduos de araucária, sendo uma espécie com alto valor comercial e que representa uma grande porcentagem do volume dessas áreas .",
+    "id": 59
+  },
+  {
+    "text": "comercial e que representa uma grande porcentagem do volume dessas áreas . Além disso, as espécies secundárias compõem a grande maioria das áreas de maior estoque volumétrico, que normalmente possuem madeiras de boa qualidade , tais como o Guatambu (Balfourodendron riedelianum (Engl.) Engl. ) e a Canjerana ( Cabralea canjerana (Vell.) Mart. ) (CORADIN et al. , 2011). 020406080100 2002 2005 2008 2011 2014Área (%) Ano Classe 1 (%) Classe 2 (%) Classe 3 (%)27 6 CONCLUSÕES A estatística univariada e não espacial é insuficiente para explicar a dinâmica do volume em uma floresta nativa de maneira satisfatória, visto que o componente espacial possui uma importância grande, ao apontar onde estão as fontes de variação de estoque volumétrico e não se atendo apenas a os valores médios.",
+    "id": 60
+  },
+  {
+    "text": "de estoque volumétrico e não se atendo apenas a os valores médios. O alcance dos semivariogramas das variáveis dendrométricas pode subsidiar a determinação da intensidade amostral ótima para inventários florestais, substituindo a metodologia tradicional de tamanho amostral por uma mais consistente em relação a espacialização das unidades amostrais, podendo trazer maior confiabilidade e redução de custos na alocação das unidades amostrais. O manejo direcionado aos núcleos de maior estoque volumétrico pode também auxiliar na manutenç ão da sustentabilidade do ecossistema e na redução dos impactos das operações na estrutura da floresta. 28 REFERÊNCIAS ALVARES, C. A.; STAPE, J. L.; SENTELHAS, P. C.; GONÇALVES, J. L. de M.; SPAROVEK, G. Köppen’s climate classi ﬁcation map for Brazil.",
+    "id": 61
+  },
+  {
+    "text": "L. de M.; SPAROVEK, G. Köppen’s climate classi ﬁcation map for Brazil. Meteorologische Zeitschrift , v. 22, p. 01 –18, 2013. BATISTA, A. P. B.; MELLO, J. M. de; RAIMUNDO, M. R.; SCOLFORO, H. F.; REIS, A. A.; SCOLFORO, J. R. S. Species richness and diversity in shrub savanna using ordinary kriging. Pesquisa Agropecuária Brasile ira, v. 51, n. 8, p. 958 –966, 2016. BITETTI, M. S; PLACCI, G.; DIETZ, L. A. Uma visão de biodiversidade para a ecorregião florestas do Alto Paraná – Bioma Mata Atlântica: Atlântica: planejando a paisagem de conservação da biodiversidade e estabelecendo prioridades para ações de conservação . Washington: World Wildlife Fund , 2003. 152 p. BRANDALISE, L. A.; LAMBERTS A. H.; MUNHOZ, C.; ULHOA, R. A. Plano de Manejo da Floresta Nacional de Irati .",
+    "id": 62
+  },
+  {
+    "text": "ULHOA, R. A. Plano de Manejo da Floresta Nacional de Irati . Fernandes Pinheiro : ICMBio , v. 1, 2013. 186 p. BRASIL. Lei nº 12.651, de 25 de maio de 2012. Dispõe sobre a proteção da vegetação nativa . Disponível em: <http://www.planalto.gov.br/ccivil_03/_Ato2011 - 2014/2012/Lei/L12651.htm>. Acesso em: 03 mai. 2018. CAMARGO, E.C.G. Geoestatística: fundamentos e aplicações. In: CÂMARA, G. & MEDEIROS, J.S. eds. Geoprocessamento para projetos ambientais. São José dos Campos: INPE, 1998. N. 2, p. 1 -5. Disponível em: <http://www.dpi.inpe.br/gilberto/ tutoriais/gis_ambiente/5geoest.pdf>. Acesso em: 1 6 mai. 2018. CAMAR GO, E. C. G.; FELGUEIRAS, C. A.; MONTEIRO, A. M. V.",
+    "id": 63
+  },
+  {
+    "text": "CAMAR GO, E. C. G.; FELGUEIRAS, C. A.; MONTEIRO, A. M. V. A importância da modelagem da anisotropia na distribuição espacial de variáveis ambientais utilizando procedimentos geoestatísticos . In: SIMPÓSIO BRASILEIRO DE SENSORIAMENTO REMOTO, 10., Foz do Iguaçu. Anais... São José dos Campos: INPE, 2001. p. 395 -402. 29 CORADIN, L.; SIMINSKI, A.; REIS, A. Espécies nativas da flora brasileira de valor econômico atual ou potencial: plantas para o futuro - Região Sul . Bras ília, DF: Minist ério do Meio Ambiente , 2011 . N. 2, 934 p. CORTE, A. P. D.; SANQUETTA, C. R.; ROGLIN, A.; PIMENTEL, A. Relações diâmetro -altura para espécies lenhosas em um fragmento de Floresta Ombrófila Mista no Sul do Paraná. Iheringia Serie Botanica ., v. 68, n. 1, p. 103–114, 2013. CUNHA, O.",
+    "id": 64
+  },
+  {
+    "text": "Serie Botanica ., v. 68, n. 1, p. 103–114, 2013. CUNHA, O. Inventário florestal do pinheiro no Sul do Brasil . Curitiba: FUPEF/ IBDF, 1978 . 327 p. ERSKINE, P. D.; LAMB, D.; BRISTOW, M. Tree species diversity and ecosystem function: Can tropical multi -species plantations generate greater productivity? Forest Ecology and Management , v. 233, n. 2 –3, p. 205 –210, 2006. FAO - Food and Agriculture Organization of the United Nations . Forest Resources Assessment 2015: Terms and Definitions . N. 180, p . 3-6. Disponível em: <http://www.fao.org/docrep/017/ap862e/ap862e00.pdf >. Acesso em: 01 mai. 2018. GILPIN, M. E. Spatial structure and population vulnerability. In: SOUL É, M. E. (ORG .). Viable populations for conservation . New York: Cambridge University Press , 1987. N. 1, p 125–140.",
+    "id": 65
+  },
+  {
+    "text": ". New York: Cambridge University Press , 1987. N. 1, p 125–140. GREZ, A. A.; BUSTAMANTE , R. O.; SIMONETTI, J. A.; FAHRIG, L. Landscape ecology, deforestation, and forest fragmentation: the case of the ruil forest in Chile. In: SALINAS -CHÁVEZ, E. ; MIDDLETON, J. (Eds.) . Landscape ecology as a tool for sustainable development in Latin America , 1998. N. x p. 1-20. IBGE - Instituto Brasileiro de Geografia e Estatística . Manual técnico da vegetação brasileira . 2 ed. Rio de Janeiro: IBGE , 2012. 271 p. ISAAKS, E. H.; SRIVASTAVA, R. M. Applied geostatistics . Oxford: Oxford University Press , 1989. 561 p. 30 KANEGAE JUNIOR, H.; MELLO, J. M. de; SCOLFORO, J. R. S.; OLIVEIRA, A. D. de.",
+    "id": 66
+  },
+  {
+    "text": "MELLO, J. M. de; SCOLFORO, J. R. S.; OLIVEIRA, A. D. de. Avaliação da continuidade espacial de características dendrométricas em diferentes idades de povoamentos clonais de Eucalyptus sp. Revista Árvore , v. 31, n. 5, p. 859 – 866, 2007. LEITE, P. F. As diferentes unidades fitoecológicas da Região Sul do Brasil. Proposta de classificação . 1994. 160 f. Dissertação (Mestrado em Engenharia Florestal ) - Setor de Ciências Agrárias, Universidade Federal do Paraná , Curitiba . MATÉRN, B. Spatial variation : stachastic models and their application to some problems in forest surveys and other sampling investigations . Statens skogsforskningsinstitut . 1960. N. 5, p. 144 . MATHERON, G. Principles of geostatistics. Economic Geology , v. 58, n. 8, p. 1246 – 1266, 1963. MORAIS, V. A.; MELLO, J. M.",
+    "id": 67
+  },
+  {
+    "text": "8, p. 1246 – 1266, 1963. MORAIS, V. A.; MELLO, J. M. de; MELLO, C. R. de; SILVA, C. A.; SCOLFORO, J. R. S. Spatial distribution of the litter carbon stock in the Cerrado biome in Minas Gerais state, Brazil. Ciência e Agrotecnologia , v. 41, n. 5, p. 580 –589, 2017. OSBORNE, J. G. Sampling errors of systematic and random surveys of cover -types areas. Journal of the american statistical association , v. 37, n. 1942, p. 256 –264, 2012. PELISSARI, A. L.; FIGUEIREDO FILHO, A.; PÉLLICO NETTO, S.; EBLING, A. A.; ROVED A, M.; SANQUETTA, C. R. Geostatistical modeling applied to spatiotemporal dynamics of successional tree species groups in a natural Mixed Tropical Forest. Ecological Indicators , v. 78, p. 1 –7, 2017. PELISSARI, A.L.; FIGUEIREDO FILHO, A.; EBLING, A. A.; SANQUETTA, C.",
+    "id": 68
+  },
+  {
+    "text": "–7, 2017. PELISSARI, A.L.; FIGUEIREDO FILHO, A.; EBLING, A. A.; SANQUETTA, C. R.; CYSNEIROS, V. C.; CORTE, A. P. D. Spatial variability of tree species diversity in a mixed tropical forest in Southern Brazil. Anais da Academia Brasileira de Ciências , 2018. (no prelo ) 31 REIS, A. A vegetação original do estado de Santa Catarina. In: Caracterização de estádios sucessionais na vegetação catarinense. Florianópolis: UFSC, p. 3 –22. 1995. RODERJAN, C. V.; GALVÃO, F.; KUNIYOSHI, Y. S.; HATSCHBACH G. G. As unidades fitogeográf icas do estado do Paraná, Brasil. Ciência e Ambiente , v. 24, n. 1, p.75–42, 2002. ROSOT, M. A. D. Manejo florestal de uso múltiplo: uma alternativa contra a extinção da Floresta com Araucária? Pesquisa Florestal Brasileira , n. 55, p. 75 –85, 2007.",
+    "id": 69
+  },
+  {
+    "text": "com Araucária? Pesquisa Florestal Brasileira , n. 55, p. 75 –85, 2007. ROVEDA, M.; FIGUEIREDO FILHO, A.; PELISSARI, A. L.; GENÚ, A. M.; ROIK, M. Modelagem geoestatística da estrutura espacial arbórea e dos atributos do solo em floresta ombrófila mista . Floresta , v. 48, n. 1, p. 67 –76, 2018a. SALES, M. H.; SOUZA, C. M.; KYRIAKIDIS, P. C.; ROBERTS, D. A.; VIDAL, E. Improving spatial distribution estimation of forest biomass with geostatistics: A case study for Rondônia, Brazil. Ecological Modelling , v. 205, n. 1 –2, p. 221 –230, 2007. SCOLFORO, H. F.; SCOLFORO, J. R. S.; MELLO, J. M. de; MELLO, C. R. de; MORAIS, V. A. Spatial interpolators for improving the mapping of carbon stock of the arboreal vegetation in Brazilian biomes of Atlantic forest and Savanna.",
+    "id": 70
+  },
+  {
+    "text": "of the arboreal vegetation in Brazilian biomes of Atlantic forest and Savanna. Forest Ecology and Management , v. 376, p. 24 –35, 2016. SIQUEIRA, J. D. P. Tabelas de volume para povoamentos nativos de Araucaria angustifolia (Bert) O. Ktze, no Sul do Brasil .1977. 179 p . Dissertação (Mestrado em Engenharia Florestal) - Setor de Ciências Agrárias, Universidade Federal do Paraná, Curitiba. Disponível em: <http://acervodigital.ufpr.br/handle/1884/43780>. Acesso em: 12/6/2018. TAYLOR, R. Interpretation of the correlation coefficient : a basic review . Journal of Diagnostic Medical Sonography , v. 6, n. 1, p. 35 –39, 1990. 32 VANCLAY, J. K. Modelling forest growth and yield: applications to mixed tropical forests . Wallingford : CAB International , 1994. 330 p. VIEIRA, S. R.",
+    "id": 71
+  },
+  {
+    "text": ". Wallingford : CAB International , 1994. 330 p. VIEIRA, S. R. Uso de geoestatística em estudos de variabilidade espacial de propriedades do solo. In: NOVAIS, R. F.; ALVAREZ, V. H.; SCHAEFER, C. E. G. R. (Org.). Tópicos em ciência do solo . Viçosa: Sociedade Brasileira de Ciência do Solo, v. 1, p. 01 –54, 2000. VILÀ, M.; VAYREDA, J.; GRACI A, C.; IBÁÑEZ, J. J. Does tree diversity increase wood production in pine forests? Oecologia , v. 135, n. 2, p. 299 –303, 2003. WEINTRAUB, A.; JONES, G.; MAGENDZO, A.; MEACHAM, M.; KIRBY, M. A heuristic system to solve mixed integer forest planning models . Operations Research , v. 42, n. 6, p. 1010 –1024, 1994.",
+    "id": 72
+  },
+  {
+    "text": ". Operations Research , v. 42, n. 6, p. 1010 –1024, 1994. 33 ANEXOS (A) Mortalidade – 2002 a 2008 (B) Mortalidade – 2008 a 2014 Figura 6 – Mapas temáticos da taxa de mortalidade em uma Floresta Ombrófila Mista. Fonte: Pelissari et al. (2018). (A) Secundárias iniciais – 2002 (B) Secundárias iniciais – 2008 (C) Secundárias iniciais – 2014 Figura 7 – Mapas temáticos da área basal d o grupo das espécies secundárias iniciais em uma Floresta Ombrófila Mista. Fonte: Pelissari et al. (2017). (A) Shannon – 2002 (B) Shannon – 2008 (C) Shannon – 2014 Figura 8 – Mapas temáticos do Índice de Shannon em uma Floresta Ombrófila Mista. Fonte: Pelissari et al. (2018). (A) A. angustifolia – 2002 (B) A. angustifolia – 2008 (C) A.",
+    "id": 73
+  },
+  {
+    "text": "(A) A. angustifolia – 2002 (B) A. angustifolia – 2008 (C) A. angustifolia – 2014 Figura 9 – Mapas temáticos d e área basal da espécie Araucaria angustifolia em uma Floresta Ombrófila Mista. Fonte: Pelissari et al. (2018).",
+    "id": 74
+  }
+]

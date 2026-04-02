@@ -1,0 +1,236 @@
+{
+  "documents": [
+    {
+      "text": "Charles Vinicius Diniz da Silva",
+      "id": 0,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        78.46699523925781,
+        327.03399658203125,
+        107.26499938964844
+      ]
+    },
+    {
+      "text": "Pinhais, PR\ncharles.vinicius.1994@gmail.com\n+5541997754240",
+      "id": 1,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        106.74700164794922,
+        222.99298095703125,
+        147.9929962158203
+      ]
+    },
+    {
+      "text": "Desenvolvedor com experiência em geotecnologia e desenvolvimento full stack, atuando na automação\nde processos e construção de soluções escaláveis. Experiência em React, TypeScript, Tailwind\nCSS, Node.js, Python e SQL, com foco em eficiência operacional, análise de dados geográficos\ne desenvolvimento de dashboards e sistemas. Vivência na criação de interfaces modernas e\ncomponentizadas, utilizando bibliotecas de UI. Perfil analítico, com facilidade em transformar problemas\ncomplexos em soluções práticas, automatizadas e orientadas a resultado.",
+      "id": 2,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        156.3470001220703,
+        540.0089111328125,
+        216.59300231933594
+      ]
+    },
+    {
+      "text": "Experiência Profissional",
+      "id": 3,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        231.4300079345703,
+        214.39199829101562,
+        251.7580108642578
+      ]
+    },
+    {
+      "text": "Autônomo\nAutônomo Free- Lancer-Pinhais, PR\nmaio de 2022 a Data Atual",
+      "id": 4,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        260.49700927734375,
+        230.23797607421875,
+        302.5929870605469
+      ]
+    },
+    {
+      "text": "Automatização de rotinas geográficas utilizando ArcPy; desenvolvimento de interfaces frontend com\nReact.js, TypeScript e estilização com Tailwind CSS, incluindo uso de bibliotecas modernas de UI como\nshadcn/ui; construção de backend completo em Node.js e eventualmente em C#/.NET; configuração,\nmodelagem e atualização de bancos de dados geográficos (SQL); atualização de tabelas de atributos via\nscripts em VB e Python.",
+      "id": 5,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        306.4469909667969,
+        540.0048828125,
+        357.6929931640625
+      ]
+    },
+    {
+      "text": "Analista de Planejamento Pleno\nNGB Florestal-Curitiba, PR\nagosto de 2020 a maio de 2022",
+      "id": 6,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        361.5970153808594,
+        260.2020263671875,
+        403.6929931640625
+      ]
+    },
+    {
+      "text": "Criação de add-ins via modelbuilder e python objetivando automatizar tarefas geográficas repetidas\n(alocação de parcelas de inventário, atualização de base com feições via GPS, avanço de colheita\nvia imagem de drone); Desenvolvimento e atualização de indicadores de colheita florestal e logística;\nDesmembramento do planejamento de longo prazo para planejamento operacional.",
+      "id": 7,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        407.5469970703125,
+        539.9989624023438,
+        449.7929992675781
+      ]
+    },
+    {
+      "text": "Assistente de geoprocessamento\nNGB Florestal-Curitiba, PR\nagosto de 2018 a agosto de 2020",
+      "id": 8,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        453.6969909667969,
+        268.51800537109375,
+        495.7929992675781
+      ]
+    },
+    {
+      "text": "Unificação e validação de três cadastros diferentes para um sistema único, tanto para as feições de\nshapes quanto informações cadastrais tabulares. Configuração e operação do sistema SGF e GISagri.",
+      "id": 9,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        499.64697265625,
+        539.9999389648438,
+        523.8930053710938
+      ]
+    },
+    {
+      "text": "Escolaridade",
+      "id": 10,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        538.7300415039062,
+        148.59600830078125,
+        559.0580444335938
+      ]
+    },
+    {
+      "text": "Engenharia (Graduação)\nUFPR-Curitiba, PR\nagosto de 2013 a agosto de 2018",
+      "id": 11,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        567.7969970703125,
+        223.739990234375,
+        609.8930053710938
+      ]
+    },
+    {
+      "text": "Habilidades e Competências",
+      "id": 12,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        626.72998046875,
+        242.66400146484375,
+        647.0579833984375
+      ]
+    },
+    {
+      "text": "• Node.js",
+      "id": 13,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        654.3980102539062,
+        114.49800109863281,
+        669.64404296875
+      ]
+    },
+    {
+      "text": "• Python",
+      "id": 14,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        670.0979614257812,
+        112.16699981689453,
+        685.343994140625
+      ]
+    },
+    {
+      "text": "• C#",
+      "id": 15,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 0,
+      "bbox": [
+        72.0,
+        685.7979736328125,
+        94.81499481201172,
+        701.0440063476562
+      ]
+    },
+    {
+      "text": "• Sensoriamento remoto",
+      "id": 16,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 1,
+      "bbox": [
+        72.0,
+        67.49800109863281,
+        184.22097778320312,
+        82.7439956665039
+      ]
+    },
+    {
+      "text": "• React",
+      "id": 17,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 1,
+      "bbox": [
+        72.0,
+        83.197998046875,
+        106.75800323486328,
+        98.4439926147461
+      ]
+    },
+    {
+      "text": "• SQL",
+      "id": 18,
+      "doc_id": "39ee6c65-0900-4ef1-816b-31fe447ebfcc",
+      "page": 1,
+      "bbox": [
+        72.0,
+        98.89800262451172,
+        98.802001953125,
+        114.14399719238281
+      ]
+    }
+  ],
+  "metadata": {
+    "filename": "Resume.pdf",
+    "path": "uploads\\39ee6c65-0900-4ef1-816b-31fe447ebfcc.pdf"
+  }
+}

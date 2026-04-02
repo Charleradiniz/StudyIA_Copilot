@@ -1,6 +1,6 @@
 from sentence_transformers import SentenceTransformer
 
-# Modelo leve e rápido (PERFEITO pra você)
+# Lightweight and fast model
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def generate_embeddings(chunks: list[str]):
