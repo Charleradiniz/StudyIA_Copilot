@@ -2,6 +2,12 @@
 
 StudyIA Copilot is a document intelligence assistant built to answer questions over PDF files using a Retrieval-Augmented Generation pipeline.
 
+> Important
+>
+> The public demo backend is hosted on Render free tier. Because of free-tier cold starts, the server can take around 30 to 50 seconds to wake up after inactivity.
+>
+> This is an intentional trade-off to keep the project publicly accessible at no cost. The repository preserves a stronger local `full` mode for technical evaluation, while the deployed version uses a lighter configuration focused on availability and zero-cost hosting.
+
 The project was designed to work well as both:
 - a technical reference for a real-world RAG application
 - a deployable product with a lightweight public demo mode
