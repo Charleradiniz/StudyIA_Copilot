@@ -21,6 +21,10 @@ STOPWORDS = {
     "mais", "menos", "muito", "muita", "muitos", "muitas", "ser", "estar",
     "fala", "falar", "documento", "esse", "essa", "isso", "ele", "ela",
 }
+SUMMARY_HINTS = {
+    "resuma", "resumo", "sumario", "sumário", "sobre", "arquivo", "curriculo",
+    "currículo", "perfil", "geral", "visao", "visão", "overview", "describe",
+}
 
 
 # =========================
@@ -36,6 +40,11 @@ def tokenize(text: str):
 
     tokens = re.findall(r"\w+", text.lower())
     return [token for token in tokens if len(token) > 2 and token not in STOPWORDS]
+
+
+def is_summary_query(question: str):
+    raw_tokens = re.findall(r"\w+", (question or "").lower())
+    return any(token in SUMMARY_HINTS for token in raw_tokens)
 
 
 # =========================
@@ -162,6 +171,36 @@ def lexical_search(documents, query, k=5):
     return scored[:k]
 
 
+def first_chunks(documents, k=5):
+    selected = []
+
+    for index, chunk in enumerate(documents):
+        text = (chunk.get("text") or "").strip()
+        if not text:
+            continue
+
+        selected.append({
+            "id": index,
+            "text": text,
+            "doc_id": chunk.get("doc_id"),
+            "file_id": chunk.get("file_id"),
+            "score": 0.0,
+            "chunk_id": chunk.get("id"),
+            "page": chunk.get("page"),
+            "bbox": chunk.get("bbox"),
+            "line_boxes": chunk.get("line_boxes", []),
+        })
+
+        if len(selected) >= k:
+            break
+
+    return selected
+
+
+def all_chunks(documents, k=8):
+    return first_chunks(documents, k=k)
+
+
 # =========================
 # MAIN ENDPOINT
 # =========================
@@ -185,9 +224,14 @@ async def ask_question(data: dict):
             if not doc:
                 return {"error": "Documento não encontrado ou inválido"}
 
-            all_results.extend(run_search(doc, question))
-            if not all_results:
-                all_results.extend(lexical_search(doc.get("documents", []), question))
+            if RAG_MODE != "full" and len(doc.get("documents", [])) <= 12:
+                all_results.extend(all_chunks(doc.get("documents", []), k=8))
+            else:
+                all_results.extend(run_search(doc, question))
+                if not all_results:
+                    all_results.extend(lexical_search(doc.get("documents", []), question))
+                if not all_results and is_summary_query(question):
+                    all_results.extend(first_chunks(doc.get("documents", []), k=5))
 
         # =========================
         # MULTI DOC MODE
@@ -213,6 +257,8 @@ async def ask_question(data: dict):
                 results = run_search(doc, question)
                 if not results:
                     results = lexical_search(doc.get("documents", []), question)
+                if not results and is_summary_query(question):
+                    results = first_chunks(doc.get("documents", []), k=5)
                 all_results.extend(results)
 
         # =========================
@@ -241,7 +287,12 @@ async def ask_question(data: dict):
         if not top_chunks and doc_id:
             doc = get_document(doc_id)
             if doc:
-                top_chunks = lexical_search(doc.get("documents", []), question)
+                if RAG_MODE != "full" and len(doc.get("documents", [])) <= 12:
+                    top_chunks = all_chunks(doc.get("documents", []), k=8)
+                else:
+                    top_chunks = lexical_search(doc.get("documents", []), question)
+                    if not top_chunks and is_summary_query(question):
+                        top_chunks = first_chunks(doc.get("documents", []), k=5)
 
         if not top_chunks:
             return {
