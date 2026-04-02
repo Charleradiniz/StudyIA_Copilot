@@ -14,7 +14,11 @@ import os
 # =========================
 # DB INIT
 # =========================
-Base.metadata.create_all(bind=engine)
+if engine is not None:
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        print(f"Database initialization skipped: {exc}")
 
 # =========================
 # APP
