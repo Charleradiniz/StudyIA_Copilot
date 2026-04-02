@@ -2,6 +2,9 @@
 
 StudyIA Copilot is a document intelligence assistant built to answer questions over PDF files using a Retrieval-Augmented Generation pipeline.
 
+Live application:
+[https://study-ia-copilot.vercel.app/](https://study-ia-copilot.vercel.app/)
+
 > Important
 >
 > The public demo backend is hosted on Render free tier. Because of free-tier cold starts, the server can take around 30 to 50 seconds to wake up after inactivity.
