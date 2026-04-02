@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askQuestion } from "./services/api";
 import PdfModal from "./components/PdfModal";
+import Sidebar from "./components/layout/Sidebar";
 
 type Source = {
   id: number;
@@ -37,6 +38,7 @@ export default function App() {
   const [documents, setDocuments] = useState<
     { id: string; name: string }[]
   >([]);
+  const [pendingFileName, setPendingFileName] = useState<string | null>(null);
 
   const [activeDoc, setActiveDoc] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -83,6 +85,7 @@ export default function App() {
     const formData = new FormData();
     formData.append("file", file);
 
+    setPendingFileName(file.name);
     setUploading(true);
 
     try {
@@ -213,61 +216,26 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-neutral-900 text-white">
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-neutral-800 p-4 hidden md:flex flex-col">
-        <h1 className="text-xl font-bold mb-6">Study Copilot</h1>
-
-        <input
-          type="file"
-          accept="application/pdf"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleFileUpload(file);
-          }}
-          className="mb-4 text-sm"
-          disabled={uploading}
-        />
-
-        {uploading && (
-          <p className="text-sm text-gray-400 mb-2">
-            Uploading PDF...
-          </p>
-        )}
-
-        <button
-          className="bg-neutral-700 hover:bg-neutral-600 p-2 rounded-lg mb-4"
-          onClick={() => {
-            setMessages([
-              {
-                role: "assistant",
-                content: "New chat started. Upload a document.",
-              },
-            ]);
-            setActiveDoc(null);
-          }}
-        >
-          + New Chat
-        </button>
-
-        <div className="space-y-2">
-          {documents.map((doc) => (
-            <button
-              key={doc.id}
-              onClick={() => {
-                console.log("DOC CLICK:", doc.id);
-                setActiveDoc(doc.id);
-              }}
-              className={`w-full text-left p-2 rounded ${
-                activeDoc === doc.id
-                  ? "bg-blue-600"
-                  : "bg-neutral-700 hover:bg-neutral-600"
-              }`}
-            >
-              {doc.name}
-            </button>
-          ))}
-        </div>
-      </aside>
+      <Sidebar
+        documents={documents}
+        activeDoc={activeDoc}
+        uploading={uploading}
+        pendingFileName={pendingFileName}
+        onUpload={handleFileUpload}
+        onNewChat={() => {
+          setMessages([
+            {
+              role: "assistant",
+              content: "New chat started. Upload a document.",
+            },
+          ]);
+          setActiveDoc(null);
+        }}
+        onSelectDoc={(docId) => {
+          console.log("DOC CLICK:", docId);
+          setActiveDoc(docId);
+        }}
+      />
 
       {/* CHAT */}
       <main className="flex-1 flex flex-col">
