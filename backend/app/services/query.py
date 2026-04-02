@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 import os
+import re
 import traceback
 
 from app.config import RAG_MODE
@@ -13,6 +14,13 @@ router = APIRouter()
 
 DOCUMENTS = {}
 DATA_DIR = "data"
+STOPWORDS = {
+    "a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em", "no",
+    "na", "nos", "nas", "um", "uma", "uns", "umas", "para", "por", "com",
+    "sem", "sobre", "que", "se", "ao", "aos", "à", "às", "ou", "como",
+    "mais", "menos", "muito", "muita", "muitos", "muitas", "ser", "estar",
+    "fala", "falar", "documento", "esse", "essa", "isso", "ele", "ela",
+}
 
 
 # =========================
@@ -20,6 +28,14 @@ DATA_DIR = "data"
 # =========================
 def rewrite_query(question: str):
     return question.strip().lower() if question else ""
+
+
+def tokenize(text: str):
+    if not text:
+        return []
+
+    tokens = re.findall(r"\w+", text.lower())
+    return [token for token in tokens if len(token) > 2 and token not in STOPWORDS]
 
 
 # =========================
@@ -108,6 +124,44 @@ def run_search(doc, query):
         return []
 
 
+def lexical_search(documents, query, k=5):
+    query_tokens = set(tokenize(query))
+
+    if not query_tokens:
+        return []
+
+    scored = []
+
+    for index, chunk in enumerate(documents):
+        text = (chunk.get("text") or "").strip()
+        if not text:
+            continue
+
+        text_tokens = set(tokenize(text))
+        overlap = query_tokens & text_tokens
+        if not overlap:
+            continue
+
+        coverage = len(overlap) / max(len(query_tokens), 1)
+        density = len(overlap) / max(len(text_tokens), 1)
+        score = round((coverage * 0.8) + (density * 0.2), 4)
+
+        scored.append({
+            "id": index,
+            "text": text,
+            "doc_id": chunk.get("doc_id"),
+            "file_id": chunk.get("file_id"),
+            "score": score,
+            "chunk_id": chunk.get("id"),
+            "page": chunk.get("page"),
+            "bbox": chunk.get("bbox"),
+            "line_boxes": chunk.get("line_boxes", []),
+        })
+
+    scored.sort(key=lambda item: item["score"], reverse=True)
+    return scored[:k]
+
+
 # =========================
 # MAIN ENDPOINT
 # =========================
@@ -132,6 +186,8 @@ async def ask_question(data: dict):
                 return {"error": "Documento não encontrado ou inválido"}
 
             all_results.extend(run_search(doc, question))
+            if not all_results:
+                all_results.extend(lexical_search(doc.get("documents", []), question))
 
         # =========================
         # MULTI DOC MODE
@@ -154,7 +210,10 @@ async def ask_question(data: dict):
                 return {"error": "Nenhum documento disponível"}
 
             for doc in docs:
-                all_results.extend(run_search(doc, question))
+                results = run_search(doc, question)
+                if not results:
+                    results = lexical_search(doc.get("documents", []), question)
+                all_results.extend(results)
 
         # =========================
         # NO RESULTS
@@ -179,6 +238,17 @@ async def ask_question(data: dict):
             if candidate_chunks and RAG_MODE == "full"
             else candidate_chunks[:5]
         )
+        if not top_chunks and doc_id:
+            doc = get_document(doc_id)
+            if doc:
+                top_chunks = lexical_search(doc.get("documents", []), question)
+
+        if not top_chunks:
+            return {
+                "question": question,
+                "answer": "NÃ£o encontrei informaÃ§Ãµes relevantes no documento.",
+                "sources": []
+            }
 
         # =========================
         # CONTEXT + LLM

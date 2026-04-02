@@ -101,12 +101,12 @@ export default function App() {
 
       console.log("UPLOAD RESPONSE:", data);
 
-      if (!id) {
+      if (!id || data.error) {
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: "Error: backend did not return a valid doc_id.",
+            content: data.error || "Error: backend did not return a valid doc_id.",
           },
         ]);
         return;
