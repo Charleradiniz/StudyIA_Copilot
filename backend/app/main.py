@@ -7,6 +7,7 @@ from app.routes.pdf import router as pdf_router
 from app.services.query import router as query_router
 from app.db.database import Base, engine
 from app.models import document
+from app.config import CORS_ORIGINS, UPLOAD_DIR
 
 import os
 
@@ -24,7 +25,6 @@ app = FastAPI()
 # PATHS
 # =========================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "..", "uploads")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -33,12 +33,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # =========================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

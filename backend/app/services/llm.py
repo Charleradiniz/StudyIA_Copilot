@@ -1,7 +1,6 @@
 import requests
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "llama3.1"
+from app.config import OLLAMA_MODEL, OLLAMA_URL
 
 
 def build_prompt(question: str, context: str) -> str:
@@ -35,7 +34,7 @@ def generate_answer(question: str, context: str) -> str:
         response = requests.post(
             OLLAMA_URL,
             json={
-                "model": MODEL,
+                "model": OLLAMA_MODEL,
                 "prompt": prompt,
                 "stream": False,
                 "temperature": 0.2  # Slight balance between precision and interpretation
