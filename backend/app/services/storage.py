@@ -1,6 +1,10 @@
 import os
 import json
-import faiss
+
+try:
+    import faiss
+except Exception:
+    faiss = None
 
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -18,8 +22,9 @@ def get_paths(doc_id: str):
 def save_document(doc_id: str, documents, index, metadata=None):
     faiss_path, json_path = get_paths(doc_id)
 
-    # Save the FAISS index
-    faiss.write_index(index, faiss_path)
+    if index is not None and faiss is not None:
+        # Save the FAISS index
+        faiss.write_index(index, faiss_path)
 
     # Save documents and metadata (important for the PDF viewer)
     payload = {
@@ -31,7 +36,7 @@ def save_document(doc_id: str, documents, index, metadata=None):
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
     return {
-        "faiss_path": faiss_path,
+        "faiss_path": faiss_path if index is not None and faiss is not None else None,
         "json_path": json_path
     }
 
@@ -42,11 +47,13 @@ def save_document(doc_id: str, documents, index, metadata=None):
 def load_document(doc_id: str):
     faiss_path, json_path = get_paths(doc_id)
 
-    if not os.path.exists(faiss_path) or not os.path.exists(json_path):
+    if not os.path.exists(json_path):
         return None
 
-    # Load the FAISS index
-    index = faiss.read_index(faiss_path)
+    index = None
+    if faiss is not None and os.path.exists(faiss_path):
+        # Load the FAISS index
+        index = faiss.read_index(faiss_path)
 
     # Load JSON
     with open(json_path, "r", encoding="utf-8") as f:

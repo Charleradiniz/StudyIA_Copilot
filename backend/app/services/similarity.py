@@ -1,7 +1,43 @@
-import numpy as np
+import math
+import re
+
+from app.config import RAG_MODE
+
+if RAG_MODE == "full":
+    try:
+        import numpy as np
+    except Exception:
+        np = None
+else:
+    np = None
+
+
+TOKEN_PATTERN = re.compile(r"\w+", re.UNICODE)
+
+
+def tokenize(text: str) -> set[str]:
+    return {token.lower() for token in TOKEN_PATTERN.findall(text or "")}
+
+
+def lexical_score(query_tokens: set[str], text: str) -> float:
+    if not query_tokens:
+        return 0.0
+
+    text_tokens = tokenize(text)
+    if not text_tokens:
+        return 0.0
+
+    overlap = len(query_tokens & text_tokens)
+    if overlap == 0:
+        return 0.0
+
+    return overlap / math.sqrt(len(text_tokens))
 
 
 def search(query, model, index, documents, k=3):
+    if RAG_MODE != "full" or model is None or index is None or np is None:
+        return search_lite(query, documents, k)
+
     try:
         # =========================
         # VALIDATIONS
@@ -80,3 +116,35 @@ def search(query, model, index, documents, k=3):
     except Exception as e:
         print(" SEARCH ERROR:", e)
         return []
+
+
+def search_lite(query, documents, k=3):
+    if not query or not documents:
+        return []
+
+    query_tokens = tokenize(query)
+    results = []
+
+    for idx, doc in enumerate(documents):
+        if not isinstance(doc, dict):
+            continue
+
+        text = doc.get("text") or ""
+        score = lexical_score(query_tokens, text)
+        if score <= 0:
+            continue
+
+        results.append({
+            "id": int(idx),
+            "text": text,
+            "doc_id": doc.get("doc_id"),
+            "file_id": doc.get("file_id"),
+            "score": float(score),
+            "chunk_id": doc.get("id"),
+            "page": doc.get("page"),
+            "bbox": doc.get("bbox"),
+            "line_boxes": doc.get("line_boxes", []),
+        })
+
+    results.sort(key=lambda item: item["score"], reverse=True)
+    return results[:k]

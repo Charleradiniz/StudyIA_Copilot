@@ -1,6 +1,14 @@
-from sentence_transformers import CrossEncoder
+from app.config import RAG_MODE
 
-reranker_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+reranker_model = None
+
+if RAG_MODE == "full":
+    try:
+        from sentence_transformers import CrossEncoder
+
+        reranker_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+    except Exception:
+        reranker_model = None
 
 
 def extract_text(chunk):
@@ -31,6 +39,9 @@ def rerank(query: str, chunks: list, top_k: int = 5):
 
     if not pairs:
         return []
+
+    if reranker_model is None:
+        return valid_chunks[:top_k]
 
     try:
         scores = reranker_model.predict(pairs)

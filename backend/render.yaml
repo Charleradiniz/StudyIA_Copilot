@@ -3,7 +3,7 @@ services:
     name: studyia-copilot-backend
     runtime: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements-deploy.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
@@ -12,5 +12,7 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-2.5-flash-lite
+      - key: RAG_MODE
+        value: lite
       - key: CORS_ORIGINS
         sync: false

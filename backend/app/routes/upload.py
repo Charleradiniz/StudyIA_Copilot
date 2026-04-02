@@ -3,15 +3,18 @@ import shutil
 import os
 from uuid import uuid4
 
+from app.config import RAG_MODE, UPLOAD_DIR  # Import from the shared config module
 from app.services.pdf_reader import extract_chunks_with_positions
 from app.services.embeddings import generate_embeddings
 from app.services.query import DOCUMENTS
 from app.services.storage import save_document
 
-from app.config import UPLOAD_DIR  # Import from the shared config module
-
-import faiss
-import numpy as np
+try:
+    import faiss
+    import numpy as np
+except Exception:
+    faiss = None
+    np = None
 
 router = APIRouter()
 
@@ -19,6 +22,9 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def create_faiss_index(embeddings):
+    if faiss is None or np is None:
+        raise ValueError("FAISS dependencies are unavailable")
+
     embeddings_np = np.array(embeddings).astype("float32")
 
     if len(embeddings_np.shape) != 2:
@@ -88,21 +94,23 @@ async def upload_pdf(file: UploadFile = File(...)):
         # =========================
         # EMBEDDINGS
         # =========================
-        embeddings = generate_embeddings(
-            [doc["text"] for doc in documents]
-        )
+        index = None
+        if RAG_MODE == "full":
+            embeddings = generate_embeddings(
+                [doc["text"] for doc in documents]
+            )
 
-        if embeddings is None or len(embeddings) == 0:
-            return {
-                "doc_id": doc_id,
-                "name": original_name,
-                "error": "Erro ao gerar embeddings"
-            }
+            if embeddings is None or len(embeddings) == 0:
+                return {
+                    "doc_id": doc_id,
+                    "name": original_name,
+                    "error": "Erro ao gerar embeddings"
+                }
 
-        # =========================
-        # FAISS INDEX
-        # =========================
-        index = create_faiss_index(embeddings)
+            # =========================
+            # FAISS INDEX
+            # =========================
+            index = create_faiss_index(embeddings)
 
         # =========================
         # IN-MEMORY CACHE

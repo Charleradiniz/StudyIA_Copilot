@@ -2,6 +2,7 @@ from fastapi import APIRouter
 import os
 import traceback
 
+from app.config import RAG_MODE
 from app.services.similarity import search
 from app.services.embeddings import model
 from app.services.llm import generate_answer
@@ -83,7 +84,7 @@ def get_document(doc_id: str):
 
     doc = normalize_loaded(doc_id, loaded)
 
-    if not doc.get("index") or not doc.get("documents"):
+    if not doc.get("documents"):
         return None
 
     DOCUMENTS[doc_id] = doc
@@ -142,8 +143,8 @@ async def ask_question(data: dict):
                 return {"error": "DATA_DIR não encontrado"}
 
             for file in os.listdir(DATA_DIR):
-                if file.endswith(".faiss"):
-                    current_id = file.replace(".faiss", "")
+                if file.endswith(".json"):
+                    current_id = file.replace(".json", "")
 
                     doc = get_document(current_id)
                     if doc:
@@ -173,7 +174,11 @@ async def ask_question(data: dict):
             if c.get("text")
         ]
 
-        top_chunks = rerank(question, candidate_chunks, top_k=5) if candidate_chunks else []
+        top_chunks = (
+            rerank(question, candidate_chunks, top_k=5)
+            if candidate_chunks and RAG_MODE == "full"
+            else candidate_chunks[:5]
+        )
 
         # =========================
         # CONTEXT + LLM
