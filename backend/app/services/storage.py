@@ -1,66 +1,83 @@
-import os
 import json
+from pathlib import Path
+
+from app.config import DATA_DIR
 
 try:
     import faiss
 except Exception:
     faiss = None
 
-DATA_DIR = "data"
-os.makedirs(DATA_DIR, exist_ok=True)
+
+DATA_PATH = Path(DATA_DIR)
+DATA_PATH.mkdir(parents=True, exist_ok=True)
 
 
 def get_paths(doc_id: str):
-    faiss_path = os.path.join(DATA_DIR, f"{doc_id}.faiss")
-    json_path = os.path.join(DATA_DIR, f"{doc_id}.json")
+    faiss_path = DATA_PATH / f"{doc_id}.faiss"
+    json_path = DATA_PATH / f"{doc_id}.json"
     return faiss_path, json_path
 
 
-# =========================
-# SAVE DOCUMENT
-# =========================
 def save_document(doc_id: str, documents, index, metadata=None):
     faiss_path, json_path = get_paths(doc_id)
 
     if index is not None and faiss is not None:
-        # Save the FAISS index
-        faiss.write_index(index, faiss_path)
+        faiss.write_index(index, str(faiss_path))
 
-    # Save documents and metadata (important for the PDF viewer)
     payload = {
         "documents": documents,
-        "metadata": metadata or {}
+        "metadata": metadata or {},
     }
 
-    with open(json_path, "w", encoding="utf-8") as f:
+    with json_path.open("w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
     return {
-        "faiss_path": faiss_path if index is not None and faiss is not None else None,
-        "json_path": json_path
+        "faiss_path": str(faiss_path) if index is not None and faiss is not None else None,
+        "json_path": str(json_path),
     }
 
 
-# =========================
-# LOAD DOCUMENT
-# =========================
-def load_document(doc_id: str):
+def load_document(doc_id: str, *, load_index: bool = True):
     faiss_path, json_path = get_paths(doc_id)
 
-    if not os.path.exists(json_path):
+    if not json_path.exists():
         return None
 
     index = None
-    if faiss is not None and os.path.exists(faiss_path):
-        # Load the FAISS index
-        index = faiss.read_index(faiss_path)
+    if load_index and faiss is not None and faiss_path.exists():
+        index = faiss.read_index(str(faiss_path))
 
-    # Load JSON
-    with open(json_path, "r", encoding="utf-8") as f:
+    with json_path.open("r", encoding="utf-8") as f:
         data = json.load(f)
+
+    if isinstance(data, list):
+        data = {
+            "documents": data,
+            "metadata": {},
+        }
 
     return {
         "documents": data.get("documents", []),
         "index": index,
-        "metadata": data.get("metadata", {})
+        "metadata": data.get("metadata", {}),
     }
+
+
+def iter_saved_documents():
+    for json_path in sorted(DATA_PATH.glob("*.json"), reverse=True):
+        doc_id = json_path.stem
+        loaded = load_document(doc_id, load_index=False)
+        if not loaded:
+            continue
+
+        faiss_path, _ = get_paths(doc_id)
+
+        yield {
+            "doc_id": doc_id,
+            "documents": loaded.get("documents", []),
+            "index": loaded.get("index"),
+            "metadata": loaded.get("metadata", {}),
+            "has_index_file": faiss_path.exists(),
+        }

@@ -1,139 +1,142 @@
 # StudyIA Copilot
 
-StudyIA Copilot is a document intelligence assistant built to answer questions over PDF files using a Retrieval-Augmented Generation pipeline.
+StudyIA Copilot is a fullstack AI application for asking grounded questions over PDF documents. The project combines PDF ingestion, retrieval, reranking, conversational context, and source highlighting in a modern chat workspace.
 
 Live application:
 [https://study-ia-copilot.vercel.app/](https://study-ia-copilot.vercel.app/)
 
 > Important
 >
-> The public demo backend is hosted on Render free tier. Because of free-tier cold starts, the server can take around 30 to 50 seconds to wake up after inactivity.
+> The public demo backend is hosted on Render free tier. Cold starts can take around 30 to 50 seconds after inactivity.
 >
-> This is an intentional trade-off to keep the project publicly accessible at no cost. The repository preserves a stronger local `full` mode for technical evaluation, while the deployed version uses a lighter configuration focused on availability and zero-cost hosting.
+> The repository keeps a stronger local `full` mode for technical evaluation, while the deployed version uses a lighter mode focused on zero-cost availability.
 
-The project was designed to work well as both:
-- a technical reference for a real-world RAG application
-- a deployable product with a lightweight public demo mode
+## What This Project Demonstrates
 
-## What This Project Shows
+This repository is meant to showcase more than a prompt wrapper:
+- PDF upload and text extraction
+- chunking with positional metadata
+- semantic retrieval with FAISS
+- reranking before answer generation
+- conversational follow-up support with short-term chat history
+- grounded answers with clickable sources
+- PDF highlights in the original document viewer
+- frontend session persistence for chats and selected documents
+- backend-powered document catalog sync on frontend load
+- system readiness signals for LLM, embeddings, reranker, and retrieval mode
+- observability logs for retrieval and generation timings
 
-This is not just a chat UI connected to an LLM. The project includes:
-- PDF ingestion and text extraction
-- document chunking with positional metadata
-- semantic retrieval
-- reranking
-- source-grounded answers
-- PDF source highlighting in the frontend
-- two execution modes: `full` and `lite`
-
-That split is intentional.
-
-The `full` mode preserves the more technically impressive architecture for local demonstration and technical discussion:
-- embeddings
-- vector search
-- reranking
-- richer retrieval pipeline
-
-The `lite` mode exists to make the public deployment viable on free infrastructure:
-- lighter dependencies
-- lower memory footprint
-- simpler retrieval fallback for short documents
-- easier deployment on Render free tier
-
-## Why The Project Uses Two Modes
-
-Free deployment platforms are great for demos, but they are not ideal for heavyweight NLP stacks that depend on packages such as `torch`, `transformers`, and `sentence-transformers`.
-
-To avoid removing the strongest technical part of the project, the application supports two different runtime strategies:
-
-- `full`: intended for local execution and technical evaluation
-- `lite`: intended for public deployment on Render free tier
-
-This allows the repository to keep the more complete RAG architecture while still offering a live version that is easy to test.
-
-## Architecture
+## Stack
 
 ### Frontend
 - React
 - TypeScript
 - Vite
+- Tailwind-style design tokens
 - `react-pdf` for document rendering
-- source-aware chat interface
-- click-to-open source snippets inside the original PDF
 
 ### Backend
 - FastAPI
-- PDF parsing with `PyMuPDF`
-- local document persistence
-- retrieval service
-- answer generation through Google AI Studio in the deployed version
+- PyMuPDF for PDF parsing
+- sentence-transformers for embeddings
+- FAISS for similarity search
+- reranking for final context selection
+- Google AI Studio for answer generation
 
-### Retrieval Design
+## Architecture Overview
 
-In `full` mode, the project is structured around:
-- semantic embeddings
-- FAISS-based similarity search
-- reranking
-- context assembly for grounded answers
+```text
+PDF upload
+  -> text extraction + positional metadata
+  -> chunk persistence
+  -> embedding generation
+  -> FAISS index
+  -> retrieval + lexical fallback
+  -> reranking
+  -> grounded prompt assembly
+  -> LLM answer
+  -> source chips + PDF highlight in UI
+```
 
-In `lite` mode, the system falls back to a lighter retrieval strategy that is more deployment-friendly while preserving the same product experience.
+## Runtime Modes
 
-## Live Demo Strategy
+The project supports two different execution strategies:
 
-The deployed version is intentionally not identical to the heaviest local version.
+- `full`: local technical demo mode with the complete retrieval stack
+- `lite`: deployment-oriented mode with lighter behavior for free hosting
 
-### Public Deployment
-- Frontend: Vercel
-- Backend: Render
-- LLM provider: Google AI Studio
-- Runtime mode: `RAG_MODE=lite`
-
-### Why
-
-The original local stack is heavier and better for technical inspection, but free-tier deployment can time out or fail when building large ML dependencies. Instead of removing those features from the codebase, the project keeps them available for local execution and deeper evaluation.
-
-This is a trade-off in favor of:
-- keeping the demo online
-- preserving the stronger engineering story in the repository
-- making the architecture discussion more realistic
+This split is intentional. It keeps the strongest AI engineering story in the repository without making the public demo too fragile for free infrastructure.
 
 ## Repository Structure
 
 ```text
 .
-├── backend
-│   ├── app
-│   │   ├── routes
-│   │   ├── services
-│   │   ├── db
-│   │   └── models
-│   ├── requirements-deploy.txt
-│   ├── requirements-full.txt
-│   └── render.yaml
-└── frontend
-    ├── src
-    └── package.json
+|-- backend
+|   |-- app
+|   |   |-- db
+|   |   |-- models
+|   |   |-- routes
+|   |   `-- services
+|   |-- requirements-deploy.txt
+|   |-- requirements-full.txt
+|   `-- render.yaml
+`-- frontend
+    |-- src
+    `-- package.json
 ```
 
 ## Local Setup
 
-### 1. Clone and install
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/Charleradiniz/StudyIA_Copilot.git
 cd StudyIA_Copilot
 ```
 
-### 2. Frontend
+### 2. Backend setup
+
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements-full.txt
+```
+
+Create `backend/.env`:
+
+```env
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-2.5-flash-lite
+RAG_MODE=full
+LOG_LEVEL=INFO
+```
+
+Optional:
+
+```env
+DATABASE_URL=sqlite:///./studycopilot.db
+CORS_ORIGINS=http://localhost:5173
+```
+
+Start the backend:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+### 3. Frontend setup
+
+In a separate terminal:
 
 ```bash
 cd frontend
 npm install
 ```
 
-Create a `.env` file in `frontend/`:
+Create `frontend/.env`:
 
-```bash
+```env
 VITE_API_URL=http://127.0.0.1:8000
 ```
 
@@ -143,105 +146,82 @@ Start the frontend:
 npm run dev
 ```
 
-### 3. Backend
+## Observability
 
-In a separate terminal:
+The backend now logs the most useful steps of the RAG pipeline:
+- retrieval time
+- rerank time
+- LLM generation time
+- total request time
+- number of retrieved chunks
+- number of selected chunks
+- document id and effective query
 
-```bash
-cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements-full.txt
-```
+These logs make the project easier to debug and easier to discuss in interviews, because you can explain not only what the system does, but how you inspect retrieval quality and latency.
 
-Start the API:
+## Frontend Product Improvements
 
-```bash
-uvicorn app.main:app --reload
-```
+The current UI includes:
+- persistent sidebar for documents, navigation, and chat history
+- split workspace with chat on the left and PDF viewer on the right
+- runtime status card showing whether vector retrieval and reranking are available
+- document cards with chunk count, page count, preview, and retrieval readiness
+- loading skeletons and streaming responses
+- mobile-friendly upload flow
+- local persistence of sessions with `localStorage` plus backend document catalog hydration
 
-## Local Full Mode With Google AI Studio
+This makes the app feel closer to a production SaaS experience rather than a single-screen prototype.
 
-The current repository uses Google AI Studio in the active LLM service file.
+## Suggested Demo Flow
 
-Set these environment variables before starting the backend:
+If you are presenting this project in an interview:
 
-```bash
-set GEMINI_API_KEY=your_key_here
-set GEMINI_MODEL=gemini-2.5-flash-lite
-set RAG_MODE=full
-```
+1. Upload a PDF with real text.
+2. Ask for a summary.
+3. Ask a follow-up question like `E o que mais?`.
+4. Open a returned source chip.
+5. Show the highlighted evidence inside the PDF viewer.
+6. Explain the retrieval logs in the backend terminal.
 
-Optional:
+That flow demonstrates:
+- ingestion
+- retrieval
+- grounded generation
+- conversational memory
+- explainability
+- fullstack UX integration
+- operational visibility
 
-```bash
-set DATABASE_URL=postgresql://postgres:postgres@localhost:5432/studycopilot
-```
+## Engineering Decisions Worth Mentioning In Interviews
 
-If no database is available, the app can still start for demo purposes.
+- The app separates a stronger local `full` mode from a cheaper public `lite` mode instead of deleting the advanced pipeline for deployment convenience.
+- PDF chunks keep positional metadata, which enables evidence highlighting instead of only plain-text citations.
+- Follow-up questions are contextualized with recent chat history so short prompts can still retrieve the right chunks.
+- The frontend persists sessions locally, which makes the product feel continuous across refreshes.
+- Logs capture retrieval and generation timing, which is useful for latency analysis and debugging retrieval quality.
 
-## Local Ollama Version
+## Current Gaps
 
-The original local prototype used Ollama for answer generation. That path is still relevant as a local-only demo strategy, especially if you want to showcase a fully local workflow.
+The project is already strong for a portfolio, but the next steps that would raise employability even more are:
+- automated backend and frontend tests
+- structured evaluation for retrieval quality
+- session persistence in a real database
+- provider abstraction for Gemini and Ollama
+- richer analytics and monitoring dashboards
 
-### When to use it
-- you want a local LLM instead of a hosted API
-- you want to demonstrate an offline-style development setup
-- you want to discuss portability between hosted and local inference
+## Deployment Notes
 
-### Recommended local stack
-- `RAG_MODE=full`
-- `requirements-full.txt`
-- Ollama running locally
+### Render backend
 
-### Ollama steps
-
-1. Install Ollama
-2. Pull a model such as:
-
-```bash
-ollama pull llama3.1
-```
-
-3. Start Ollama locally
-
-```bash
-ollama serve
-```
-
-4. Replace the backend LLM provider implementation in `backend/app/services/llm.py` with an Ollama-based version like the original prototype:
-
-```python
-import requests
-
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "llama3.1"
-```
-
-5. Run the backend with:
-
-```bash
-set RAG_MODE=full
-uvicorn app.main:app --reload
-```
-
-### Important note
-
-The deployed repository is configured around Google AI Studio because that was the most practical option for a public free-tier demo. Ollama is best treated here as a local development and presentation path, not the public deployment path.
-
-## Deployment Configuration
-
-### Render Backend
-
-The backend uses the lightweight deployment requirements:
+Use the lighter deployment requirements:
 
 ```bash
 pip install -r requirements-deploy.txt
 ```
 
-Environment variables expected in Render:
+Expected environment variables:
 
-```bash
+```env
 GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-2.5-flash-lite
 RAG_MODE=lite
@@ -249,55 +229,18 @@ CORS_ORIGINS=https://your-frontend.vercel.app
 DATABASE_URL=your_database_url
 ```
 
-### Vercel Frontend
+### Vercel frontend
 
-Environment variable:
-
-```bash
+```env
 VITE_API_URL=https://your-render-service.onrender.com
 ```
 
-## Engineering Notes
+## Why This Project Is Good For A Fullstack AI Portfolio
 
-The strongest technical value of this project is not only the live demo, but the engineering decisions behind it:
-- preserving a heavier RAG stack for local execution
-- adapting the product for free-tier deployment instead of deleting complexity
-- grounding answers in retrievable document sources
-- surfacing those sources visually in the original PDF
-- treating deployment constraints as part of the architecture, not as an afterthought
-
-This project intentionally highlights:
+This project shows a combination that recruiters and interviewers often look for:
 - product thinking
-- infrastructure trade-off awareness
-- applied AI engineering beyond prompt wrappers
-
-## Suggested Demo Flow
-
-If you are reviewing this project locally:
-
-1. Upload a PDF
-2. Ask for a summary
-3. Ask a specific question
-4. Open the returned source snippets
-5. Verify the highlighted evidence inside the PDF viewer
-
-That flow demonstrates:
-- ingestion
-- retrieval
-- grounded generation
-- explainability
-- UX integration between search and source verification
-
-## Current Status
-
-- Public demo mode is optimized for free-tier deployment
-- Local mode remains the best way to inspect the full technical architecture
-- The repository intentionally documents the difference between those two realities
-
-## Future Improvements
-
-- provider abstraction for Gemini and Ollama in the same code path
-- richer multi-document retrieval in lite mode
-- stronger observability around retrieval quality
-- automated evaluation for answer grounding
-- more explicit benchmark comparison between `full` and `lite`
+- applied AI engineering
+- retrieval grounding
+- UX attention around evidence and explainability
+- deployment trade-off awareness
+- fullstack ownership from interface to inference

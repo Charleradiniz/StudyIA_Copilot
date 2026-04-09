@@ -1,1 +1,66 @@
 @import "tailwindcss";
+
+:root {
+  --app-bg: #07111f;
+  --app-foreground: #e6eef8;
+  --panel-strong: #0b1627;
+  --panel: #101c2f;
+  --muted-foreground: #8fa3bf;
+  --accent: #5eead4;
+  --accent-soft: rgba(94, 234, 212, 0.28);
+  --accent-surface: rgba(45, 212, 191, 0.14);
+}
+
+html {
+  background: var(--app-bg);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at top left, rgba(94, 234, 212, 0.08), transparent 28%),
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.08), transparent 24%),
+    var(--app-bg);
+  color: var(--app-foreground);
+  font-family:
+    "Space Grotesk",
+    "IBM Plex Sans",
+    "Segoe UI",
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+  line-height: 1.5;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: rgba(94, 234, 212, 0.24);
+  color: #f8fbff;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(11, 22, 39, 0.92);
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(11, 22, 39, 0.92);
+  border-radius: 999px;
+  background: rgba(143, 163, 191, 0.28);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(143, 163, 191, 0.4);
+}

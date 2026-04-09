@@ -1,9 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+import logging
 import os
 import re
 import traceback
+from time import perf_counter
 
-from app.config import RAG_MODE
+from pydantic import BaseModel
+
+from app.config import DATA_DIR, RAG_MODE
 from app.services.similarity import search
 from app.services.embeddings import model
 from app.services.llm import generate_answer
@@ -11,9 +15,9 @@ from app.services.reranker import rerank
 from app.services.storage import load_document
 
 router = APIRouter()
+logger = logging.getLogger("studyiacopilot.query")
 
 DOCUMENTS = {}
-DATA_DIR = "data"
 STOPWORDS = {
     "a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em", "no",
     "na", "nos", "nas", "um", "uma", "uns", "umas", "para", "por", "com",
@@ -25,6 +29,17 @@ SUMMARY_HINTS = {
     "resuma", "resumo", "sumario", "sumário", "sobre", "arquivo", "curriculo",
     "currículo", "perfil", "geral", "visao", "visão", "overview", "describe",
 }
+FOLLOW_UP_HINTS = {
+    "mais", "melhor", "detalhe", "detalhes", "isso", "essa", "esse", "aquilo",
+    "tambem", "também", "aprofunde", "continue", "continua", "complementa",
+    "explique", "explica", "fale", "fala",
+}
+
+
+class AskRequest(BaseModel):
+    question: str
+    doc_id: str | None = None
+    history: list[dict] | None = None
 
 
 # =========================
@@ -47,16 +62,50 @@ def is_summary_query(question: str):
     return any(token in SUMMARY_HINTS for token in raw_tokens)
 
 
+def is_follow_up_question(question: str):
+    raw_tokens = re.findall(r"\w+", (question or "").lower())
+    if len(raw_tokens) <= 4:
+        return True
+    return any(token in FOLLOW_UP_HINTS for token in raw_tokens)
+
+
+def build_effective_query(question: str, history: list[dict] | None = None) -> str:
+    if not history or not is_follow_up_question(question):
+        return question
+
+    last_user = ""
+    last_assistant = ""
+
+    for turn in reversed(history):
+        role = turn.get("role")
+        content = (turn.get("content") or "").strip()
+        if not content:
+            continue
+
+        if role == "assistant" and not last_assistant:
+            last_assistant = content[:500]
+            continue
+
+        if role == "user":
+            last_user = content[:200]
+            break
+
+    contextual_parts = [part for part in [last_user, last_assistant, question] if part]
+    return " ".join(contextual_parts)
+
+
 # =========================
-# SINGLE NORMALIZER (CRITICAL FIX)
+# SINGLE NORMALIZER
 # =========================
 def normalize_loaded(doc_id: str, loaded: dict):
+    metadata = loaded.get("metadata", {})
     return {
         "doc_id": doc_id,
         "documents": loaded.get("documents", []),
         "index": loaded.get("index"),
-        "name": loaded.get("metadata", {}).get("filename"),
-        "path": loaded.get("metadata", {}).get("path")
+        "name": metadata.get("filename"),
+        "path": metadata.get("path"),
+        "metadata": metadata,
     }
 
 
@@ -66,8 +115,8 @@ def normalize_loaded(doc_id: str, loaded: dict):
 def build_context(chunks):
     formatted = []
 
-    for i, c in enumerate(chunks, 1):
-        text = c.get("text", "")
+    for i, chunk in enumerate(chunks, 1):
+        text = chunk.get("text", "")
         if text:
             formatted.append(f"[TRECHO {i}]\n{text}")
 
@@ -120,16 +169,19 @@ def get_document(doc_id: str):
 # SEARCH WRAPPER SAFE
 # =========================
 def run_search(doc, query):
+    if RAG_MODE != "full" or model is None or not doc.get("index"):
+        return []
+
     try:
         return search(
             query=query,
             model=model,
             index=doc["index"],
             documents=doc["documents"],
-            k=10
+            k=10,
         )
-    except Exception as e:
-        print("🔥 SEARCH ERROR:", e)
+    except Exception as error:
+        print("SEARCH ERROR:", error)
         return []
 
 
@@ -205,15 +257,18 @@ def all_chunks(documents, k=8):
 # MAIN ENDPOINT
 # =========================
 @router.post("/ask")
-async def ask_question(data: dict):
+async def ask_question(data: AskRequest):
+    request_started_at = perf_counter()
     try:
-        question = rewrite_query(data.get("question"))
-        doc_id = data.get("doc_id")
+        question = rewrite_query(data.question)
+        doc_id = data.doc_id
+        effective_question = build_effective_query(question, data.history)
 
         if not question:
-            return {"error": "question é obrigatório"}
+            raise HTTPException(status_code=400, detail="question é obrigatório")
 
         all_results = []
+        retrieval_started_at = perf_counter()
 
         # =========================
         # SINGLE DOC MODE
@@ -222,14 +277,14 @@ async def ask_question(data: dict):
             doc = get_document(doc_id)
 
             if not doc:
-                return {"error": "Documento não encontrado ou inválido"}
+                raise HTTPException(status_code=404, detail="Documento não encontrado ou inválido")
 
             if RAG_MODE != "full" and len(doc.get("documents", [])) <= 12:
                 all_results.extend(all_chunks(doc.get("documents", []), k=8))
             else:
-                all_results.extend(run_search(doc, question))
+                all_results.extend(run_search(doc, effective_question))
                 if not all_results:
-                    all_results.extend(lexical_search(doc.get("documents", []), question))
+                    all_results.extend(lexical_search(doc.get("documents", []), effective_question))
                 if not all_results and is_summary_query(question):
                     all_results.extend(first_chunks(doc.get("documents", []), k=5))
 
@@ -240,7 +295,7 @@ async def ask_question(data: dict):
             docs = []
 
             if not os.path.exists(DATA_DIR):
-                return {"error": "DATA_DIR não encontrado"}
+                raise HTTPException(status_code=500, detail="DATA_DIR não encontrado")
 
             for file in os.listdir(DATA_DIR):
                 if file.endswith(".json"):
@@ -251,36 +306,46 @@ async def ask_question(data: dict):
                         docs.append(doc)
 
             if not docs:
-                return {"error": "Nenhum documento disponível"}
+                raise HTTPException(status_code=404, detail="Nenhum documento disponível")
 
             for doc in docs:
-                results = run_search(doc, question)
-                if not results:
-                    results = lexical_search(doc.get("documents", []), question)
-                if not results and is_summary_query(question):
-                    results = first_chunks(doc.get("documents", []), k=5)
+                if RAG_MODE != "full" and len(doc.get("documents", [])) <= 12:
+                    results = all_chunks(doc.get("documents", []), k=8)
+                else:
+                    results = run_search(doc, effective_question)
+                    if not results:
+                        results = lexical_search(doc.get("documents", []), effective_question)
+                    if not results and is_summary_query(question):
+                        results = first_chunks(doc.get("documents", []), k=5)
                 all_results.extend(results)
+
+        retrieval_ms = round((perf_counter() - retrieval_started_at) * 1000, 2)
 
         # =========================
         # NO RESULTS
         # =========================
         if not all_results:
+            logger.info(
+                "ask_no_results doc_id=%s question=%r effective_question=%r history_turns=%s retrieval_ms=%s",
+                doc_id,
+                question[:200],
+                effective_question[:300],
+                len(data.history or []),
+                retrieval_ms,
+            )
             return {
                 "question": question,
                 "answer": "Não encontrei informações relevantes no documento.",
-                "sources": []
+                "sources": [],
             }
 
         # =========================
         # RERANK SAFE
         # =========================
-        candidate_chunks = [
-            c for c in all_results[:20]
-            if c.get("text")
-        ]
-
+        candidate_chunks = [chunk for chunk in all_results[:20] if chunk.get("text")]
+        rerank_started_at = perf_counter()
         top_chunks = (
-            rerank(question, candidate_chunks, top_k=5)
+            rerank(effective_question, candidate_chunks, top_k=5)
             if candidate_chunks and RAG_MODE == "full"
             else candidate_chunks[:5]
         )
@@ -290,22 +355,50 @@ async def ask_question(data: dict):
                 if RAG_MODE != "full" and len(doc.get("documents", [])) <= 12:
                     top_chunks = all_chunks(doc.get("documents", []), k=8)
                 else:
-                    top_chunks = lexical_search(doc.get("documents", []), question)
+                    top_chunks = lexical_search(doc.get("documents", []), effective_question)
                     if not top_chunks and is_summary_query(question):
                         top_chunks = first_chunks(doc.get("documents", []), k=5)
+        rerank_ms = round((perf_counter() - rerank_started_at) * 1000, 2)
 
         if not top_chunks:
+            logger.info(
+                "ask_no_top_chunks doc_id=%s question=%r effective_question=%r history_turns=%s retrieval_ms=%s rerank_ms=%s",
+                doc_id,
+                question[:200],
+                effective_question[:300],
+                len(data.history or []),
+                retrieval_ms,
+                rerank_ms,
+            )
             return {
                 "question": question,
-                "answer": "NÃ£o encontrei informaÃ§Ãµes relevantes no documento.",
-                "sources": []
+                "answer": "Não encontrei informações relevantes no documento.",
+                "sources": [],
             }
 
         # =========================
         # CONTEXT + LLM
         # =========================
         context = build_context(top_chunks)
-        answer = generate_answer(question, context)
+        llm_started_at = perf_counter()
+        answer = generate_answer(question, context, data.history)
+        llm_ms = round((perf_counter() - llm_started_at) * 1000, 2)
+        total_ms = round((perf_counter() - request_started_at) * 1000, 2)
+
+        logger.info(
+            "ask_completed doc_id=%s rag_mode=%s question=%r effective_question=%r history_turns=%s retrieval_results=%s selected_chunks=%s retrieval_ms=%s rerank_ms=%s llm_ms=%s total_ms=%s",
+            doc_id,
+            RAG_MODE,
+            question[:200],
+            effective_question[:300],
+            len(data.history or []),
+            len(all_results),
+            len(top_chunks),
+            retrieval_ms,
+            rerank_ms,
+            llm_ms,
+            total_ms,
+        )
 
         # =========================
         # RESPONSE
@@ -313,18 +406,31 @@ async def ask_question(data: dict):
         return {
             "question": question,
             "answer": answer,
-            "sources": format_sources(top_chunks)
+            "sources": format_sources(top_chunks),
         }
 
-    except Exception as e:
-        print("🔥 ERRO NO /ASK")
+    except Exception as error:
+        if isinstance(error, HTTPException):
+            logger.warning(
+                "ask_http_error doc_id=%s question=%r status_code=%s detail=%r",
+                data.doc_id,
+                (data.question or "")[:200],
+                error.status_code,
+                error.detail,
+            )
+            raise
+        print("ERRO NO /ASK")
         traceback.print_exc()
-
-        return {"error": str(e)}
+        logger.exception(
+            "ask_unhandled_error doc_id=%s question=%r",
+            data.doc_id,
+            (data.question or "")[:200],
+        )
+        raise HTTPException(status_code=500, detail=str(error))
 
 
 # =========================
-# COMPAT LAYER (FIXED)
+# COMPAT LAYER
 # =========================
 def search_similar_documents(question: str, doc_id: str = None):
     try:
@@ -337,6 +443,6 @@ def search_similar_documents(question: str, doc_id: str = None):
 
         return run_search(doc, question)
 
-    except Exception as e:
-        print("🔥 ERRO search_similar_documents:", e)
+    except Exception as error:
+        print("ERRO search_similar_documents:", error)
         return []

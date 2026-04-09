@@ -1,5 +1,6 @@
-import { useEffect } from "react";
-import PdfViewer from "./PdfViewer";
+import { Suspense, lazy, useEffect } from "react";
+
+const PdfViewer = lazy(() => import("./PdfViewer"));
 
 type Highlight = {
   chunk_id?: number;
@@ -26,12 +27,6 @@ export default function PdfModal({
   const isValidUrl = fileUrl.trim().length > 0;
 
   useEffect(() => {
-    if (isValidUrl) {
-      console.log("PDF MODAL LOAD URL:", fileUrl);
-    }
-  }, [fileUrl, isValidUrl]);
-
-  useEffect(() => {
     if (!open) return;
 
     const handleEsc = (e: KeyboardEvent) => {
@@ -54,22 +49,26 @@ export default function PdfModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 lg:hidden">
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
 
       <div
-        className="relative flex h-[95vh] w-[95vw] flex-col overflow-hidden rounded-2xl bg-neutral-900 shadow-2xl"
+        className="relative flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[var(--panel-strong)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="PDF viewer"
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-neutral-700 px-4 py-3">
-          <span className="text-sm text-neutral-300">Viewing PDF</span>
+        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-4">
+          <span className="text-sm font-medium text-white">Viewing PDF</span>
 
           <button
+            type="button"
             onClick={onClose}
-            className="rounded bg-red-500 px-3 py-1 text-sm hover:bg-red-600"
+            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white transition hover:border-white/20 hover:bg-white/10"
           >
             Close
           </button>
@@ -77,17 +76,25 @@ export default function PdfModal({
 
         <div className="flex h-full w-full flex-1 overflow-hidden">
           {isValidUrl ? (
-            <PdfViewer
-              key={`${fileUrl}-${focusToken}`}
-              fileUrl={fileUrl}
-              targetChunk={
-                typeof highlight?.chunk_id === "number"
-                  ? highlight.chunk_id
-                  : undefined
+            <Suspense
+              fallback={
+                <div className="flex h-full w-full items-center justify-center text-neutral-400">
+                  Loading PDF viewer...
+                </div>
               }
-              highlight={highlight ?? undefined}
-              focusToken={focusToken}
-            />
+            >
+              <PdfViewer
+                key={fileUrl}
+                fileUrl={fileUrl}
+                targetChunk={
+                  typeof highlight?.chunk_id === "number"
+                    ? highlight.chunk_id
+                    : undefined
+                }
+                highlight={highlight ?? undefined}
+                focusToken={focusToken}
+              />
+            </Suspense>
           ) : (
             <div className="flex h-full w-full items-center justify-center text-neutral-400">
               No PDF file specified

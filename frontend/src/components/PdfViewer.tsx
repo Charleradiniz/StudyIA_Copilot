@@ -58,17 +58,6 @@ export default function PdfViewer({ fileUrl, targetChunk, focusToken, highlight 
     };
   }, []);
 
-  useEffect(() => {
-    setNumPages(0);
-    setError(null);
-    setIsLoading(Boolean(fileUrl));
-    setPageMetrics({});
-    pageRefs.current = [];
-    setHighlightElement(null);
-    lastPageScrollKeyRef.current = "";
-    lastHighlightScrollKeyRef.current = "";
-  }, [fileUrl]);
-
   const handleLoadSuccess = ({ numPages: nextNumPages }: PDFDocumentProxy) => {
     setNumPages(nextNumPages);
     setError(null);
@@ -104,7 +93,7 @@ export default function PdfViewer({ fileUrl, targetChunk, focusToken, highlight 
       width: (x1 - x0) * scale,
       height: Math.max((y1 - y0) * scale, 18),
     };
-  }, [highlight?.bbox, highlightPageNumber, pageMetrics, pageWidth]);
+  }, [highlight, highlightPageNumber, pageMetrics, pageWidth]);
 
   const highlightLineRects = useMemo(() => {
     if (!highlight?.line_boxes?.length || highlightPageNumber === null) {
@@ -126,7 +115,7 @@ export default function PdfViewer({ fileUrl, targetChunk, focusToken, highlight 
         width: Math.max((x1 - x0) * scale, 24),
         height: Math.max((y1 - y0) * scale, 18),
       }));
-  }, [highlight?.line_boxes, highlightPageNumber, pageMetrics, pageWidth]);
+  }, [highlight, highlightPageNumber, pageMetrics, pageWidth]);
 
   const highlightKey = useMemo(() => {
     const bboxKey = highlight?.bbox?.join(",") ?? "no-bbox";
@@ -134,7 +123,7 @@ export default function PdfViewer({ fileUrl, targetChunk, focusToken, highlight 
     const chunkKey = targetChunk ?? "no-chunk";
 
     return `${fileUrl}|${pageKey}|${bboxKey}|${chunkKey}|${focusToken}`;
-  }, [fileUrl, focusToken, highlight?.bbox, highlightPageNumber, targetChunk]);
+  }, [fileUrl, focusToken, highlight, highlightPageNumber, targetChunk]);
 
   const handlePageLoadSuccess = (page: PDFPageProxy) => {
     setPageMetrics((current) => {
@@ -162,7 +151,7 @@ export default function PdfViewer({ fileUrl, targetChunk, focusToken, highlight 
       typeof highlight?.page === "number" ? highlight.page + 1 : undefined;
     const targetPageNumber =
       highlightedPage ??
-      (targetChunk
+      (typeof targetChunk === "number"
         ? Math.max(1, Math.min(numPages, Math.floor(targetChunk / 4) + 1))
         : undefined);
 
@@ -226,19 +215,32 @@ export default function PdfViewer({ fileUrl, targetChunk, focusToken, highlight 
   }, [highlightElement, highlightKey, highlightPageNumber, highlightRect]);
 
   if (!fileUrl) {
-    return <div className="p-4 text-red-400">No PDF selected.</div>;
+    return (
+      <div className="flex h-full items-center justify-center p-6 text-sm text-[var(--muted-foreground)]">
+        No PDF selected.
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="p-4 text-red-400">{error}</div>;
+    return (
+      <div className="flex h-full items-center justify-center p-6 text-sm text-red-300">
+        {error}
+      </div>
+    );
   }
 
   return (
-    <div ref={containerRef} className="h-full w-full overflow-auto bg-neutral-900 p-4">
+    <div ref={containerRef} className="h-full w-full overflow-auto bg-[var(--panel)] p-4">
       <Document
         file={file}
-        loading={<div className="mb-4 text-gray-400">Loading PDF...</div>}
-        error={<div className="p-4 text-red-400">Error loading PDF.</div>}
+        loading={
+          <div className="space-y-4 p-2">
+            <div className="h-6 w-40 animate-pulse rounded-full bg-white/10" />
+            <div className="h-[420px] animate-pulse rounded-[24px] border border-white/10 bg-white/[0.03]" />
+          </div>
+        }
+        error={<div className="p-4 text-red-300">Error loading PDF.</div>}
         onLoadSuccess={handleLoadSuccess}
         onLoadError={handleLoadError}
       >
@@ -248,7 +250,7 @@ export default function PdfViewer({ fileUrl, targetChunk, focusToken, highlight 
             ref={(element) => {
               pageRefs.current[index] = element;
             }}
-            className="relative mb-4 flex justify-center"
+            className="relative mb-4 flex justify-center transition-all duration-300"
           >
             <Page
               pageNumber={index + 1}
@@ -274,7 +276,7 @@ export default function PdfViewer({ fileUrl, targetChunk, focusToken, highlight 
                   (lineRect, lineIndex) => (
                     <div
                       key={`${highlightKey}-line-${lineIndex}`}
-                      className="absolute rounded-sm"
+                      className="absolute rounded-sm transition-all duration-300"
                       style={{
                         left: lineRect.left - highlightRect.left,
                         top: lineRect.top - highlightRect.top,

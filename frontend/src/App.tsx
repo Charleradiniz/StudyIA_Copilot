@@ -1,335 +1,583 @@
-import { useState, useEffect, useRef } from "react";
-import { askQuestion } from "./services/api";
+import { startTransition, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { createAssistantMessage, createChat, createId } from "./app/chat-utils";
+import type {
+  AppDocument,
+  ChatSession,
+  ConversationTurn,
+  Source,
+  SystemStatus,
+} from "./app/types";
 import PdfModal from "./components/PdfModal";
-import Sidebar from "./components/layout/Sidebar";
+import ChatWorkspace from "./components/workspace/ChatWorkspace";
+import SidebarPanel from "./components/workspace/SidebarPanel";
+import ViewerPanel from "./components/workspace/ViewerPanel";
+import {
+  API_URL,
+  askQuestion,
+  getSystemStatus,
+  listDocuments,
+  uploadPdf,
+  type DocumentSummaryResponse,
+  type SystemStatusResponse,
+} from "./services/api";
 
-type Source = {
-  id: number;
-  text: string;
-  score?: number;
-  doc_id?: string;
-  chunk_id?: number;
-  page?: number;
-  bbox?: number[];
-  line_boxes?: number[][];
-  pdf_width?: number;
-  pdf_height?: number;
+const WORKSPACE_STORAGE_KEY = "studyiacopilot.workspace.v2";
+const LEGACY_WORKSPACE_STORAGE_KEY = "studyiacopilot.workspace.v1";
+
+type PersistedWorkspace = {
+  documents: AppDocument[];
+  chats: ChatSession[];
+  activeChatId: string;
+  activeNav: "workspace" | "documents" | "activity";
+  viewerDocId: string | null;
 };
 
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-  sources?: Source[];
-};
+function toTimestamp(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
 
-const API_URL = (
-  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
-).replace(/\/+$/, "");
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  return Date.now();
+}
+
+function normalizeDocument(
+  value: Partial<AppDocument> & { id?: unknown; name?: unknown },
+): AppDocument | null {
+  if (typeof value.id !== "string" || typeof value.name !== "string") {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    name: value.name,
+    uploadedAt: toTimestamp(value.uploadedAt),
+    chunkCount:
+      typeof value.chunkCount === "number"
+        ? value.chunkCount
+        : typeof value.chunkCount === "string"
+          ? Number(value.chunkCount) || 0
+          : 0,
+    pageCount:
+      typeof value.pageCount === "number"
+        ? value.pageCount
+        : typeof value.pageCount === "string"
+          ? Number(value.pageCount) || 0
+          : 0,
+    ragMode: typeof value.ragMode === "string" ? value.ragMode : "lite",
+    vectorReady: Boolean(value.vectorReady),
+    preview: typeof value.preview === "string" ? value.preview : "",
+  };
+}
+
+function mapApiDocument(document: DocumentSummaryResponse): AppDocument {
+  return {
+    id: document.doc_id,
+    name: document.name,
+    uploadedAt: toTimestamp(document.uploaded_at),
+    chunkCount: document.chunks,
+    pageCount: document.pages,
+    ragMode: document.rag_mode,
+    vectorReady: document.vector_ready,
+    preview: document.preview,
+  };
+}
+
+function mapSystemStatus(status: SystemStatusResponse): SystemStatus {
+  return {
+    status: status.status,
+    ragMode: status.rag_mode,
+    geminiModel: status.gemini_model,
+    llmConfigured: status.llm_configured,
+    embeddingModelLoaded: status.embedding_model_loaded,
+    rerankerLoaded: status.reranker_loaded,
+    vectorSearchEnabled: status.vector_search_enabled,
+    documentsIndexed: status.documents_indexed,
+    workspaceDataAvailable: status.workspace_data_available,
+  };
+}
+
+function mergeDocuments(...collections: AppDocument[][]) {
+  const merged = new Map<string, AppDocument>();
+
+  for (const collection of collections) {
+    for (const document of collection) {
+      const current = merged.get(document.id);
+      merged.set(document.id, current ? { ...current, ...document } : document);
+    }
+  }
+
+  return [...merged.values()].sort((left, right) => right.uploadedAt - left.uploadedAt);
+}
+
+function loadPersistedWorkspace(): PersistedWorkspace | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw =
+      window.localStorage.getItem(WORKSPACE_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_WORKSPACE_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<PersistedWorkspace>;
+    if (!Array.isArray(parsed.documents) || !Array.isArray(parsed.chats) || parsed.chats.length === 0) {
+      return null;
+    }
+
+    const documents = parsed.documents
+      .map((document) => normalizeDocument(document as Partial<AppDocument>))
+      .filter((document): document is AppDocument => Boolean(document));
+
+    const activeNav =
+      parsed.activeNav === "documents" || parsed.activeNav === "activity"
+        ? parsed.activeNav
+        : "workspace";
+
+    return {
+      documents,
+      chats: parsed.chats,
+      activeChatId:
+        typeof parsed.activeChatId === "string" && parsed.activeChatId
+          ? parsed.activeChatId
+          : parsed.chats[0].id,
+      activeNav,
+      viewerDocId: typeof parsed.viewerDocId === "string" ? parsed.viewerDocId : null,
+    };
+  } catch (error) {
+    console.error("Failed to load persisted workspace", error);
+    return null;
+  }
+}
 
 export default function App() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: "Hello! Send me a document and ask a question.",
-    },
-  ]);
-
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const [documents, setDocuments] = useState<
-    { id: string; name: string }[]
-  >([]);
-  const [pendingFileName, setPendingFileName] = useState<string | null>(null);
-
-  const [activeDoc, setActiveDoc] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-
-  const [pdfOpen, setPdfOpen] = useState(false);
-  const [selectedSource, setSelectedSource] = useState<Source | null>(null);
-  const [pdfFocusToken, setPdfFocusToken] = useState(0);
-
-  // Modal document id used by the PDF viewer.
-  const [modalDocId, setModalDocId] = useState<string | null>(null);
-
+  const persistedWorkspace = loadPersistedWorkspace();
+  const initialChatRef = useRef<ChatSession>(persistedWorkspace?.chats[0] ?? createChat());
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
+  const [documents, setDocuments] = useState<AppDocument[]>(persistedWorkspace?.documents ?? []);
+  const [chats, setChats] = useState<ChatSession[]>(
+    persistedWorkspace?.chats ?? [initialChatRef.current],
+  );
+  const [activeChatId, setActiveChatId] = useState(
+    persistedWorkspace?.activeChatId ?? initialChatRef.current.id,
+  );
+  const [input, setInput] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [activeNav, setActiveNav] = useState<"workspace" | "documents" | "activity">(
+    persistedWorkspace?.activeNav ?? "workspace",
+  );
+  const [viewerDocId, setViewerDocId] = useState<string | null>(persistedWorkspace?.viewerDocId ?? null);
+  const [selectedSource, setSelectedSource] = useState<Source | null>(null);
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfFocusToken, setPdfFocusToken] = useState(0);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
+  );
+
+  const activeChat = useMemo(
+    () => chats.find((chat) => chat.id === activeChatId) ?? chats[0],
+    [activeChatId, chats],
+  );
+
+  const activeDocument = useMemo(
+    () => documents.find((doc) => doc.id === activeChat?.activeDocId) ?? null,
+    [activeChat?.activeDocId, documents],
+  );
+
   useEffect(() => {
+    if (!activeChat) return;
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // =========================
-  // DEBUG 
-  // =========================
-  useEffect(() => {
-    console.log("ACTIVE DOC:", activeDoc);
-  }, [activeDoc]);
+  }, [activeChat]);
 
   useEffect(() => {
-    console.log("PDF OPEN:", pdfOpen);
-  }, [pdfOpen]);
+    if (typeof window === "undefined") return undefined;
 
-  // =========================
-  // PDF URL
-  // =========================
-  const pdfUrl = modalDocId
-    ? `${API_URL}/api/pdf/${modalDocId}`
-    : "";
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const syncLayoutMode = (event?: MediaQueryListEvent) => {
+      setIsDesktop(event?.matches ?? mediaQuery.matches);
+    };
+
+    syncLayoutMode();
+    mediaQuery.addEventListener("change", syncLayoutMode);
+
+    return () => mediaQuery.removeEventListener("change", syncLayoutMode);
+  }, []);
 
   useEffect(() => {
-    console.log("PDF URL:", pdfUrl);
-  }, [pdfUrl]);
+    if (!activeChat?.activeDocId) return;
+    setViewerDocId((current) => current ?? activeChat.activeDocId);
+  }, [activeChat?.activeDocId]);
 
-  // =========================
-  // UPLOAD PDF
-  // =========================
-  const handleFileUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
+  useEffect(() => {
+    if (typeof window === "undefined" || chats.length === 0 || !activeChat) return;
 
-    setPendingFileName(file.name);
-    setUploading(true);
+    const payload: PersistedWorkspace = {
+      documents,
+      chats,
+      activeChatId: activeChat.id,
+      activeNav,
+      viewerDocId,
+    };
 
-    try {
-      const res = await fetch(`${API_URL}/api/upload`, {
-        method: "POST",
-        body: formData,
-      });
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(payload));
+  }, [activeChat, activeNav, chats, documents, viewerDocId]);
 
-      const data = await res.json();
-      const id = data.doc_id;
+  useEffect(() => {
+    let ignore = false;
 
-      console.log("UPLOAD RESPONSE:", data);
-
-      if (!id || data.error) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: data.error || "Error: backend did not return a valid doc_id.",
-          },
-        ]);
+    Promise.allSettled([listDocuments(), getSystemStatus()]).then((results) => {
+      if (ignore) {
         return;
       }
 
-      setDocuments((prev) => [
-        ...prev,
-        { id, name: data.name || file.name },
-      ]);
+      const [documentsResult, systemResult] = results;
 
-      setActiveDoc(id);
+      if (documentsResult.status === "fulfilled") {
+        const remoteDocuments = documentsResult.value.documents.map(mapApiDocument);
+        startTransition(() => {
+          setDocuments((currentDocuments) => mergeDocuments(currentDocuments, remoteDocuments));
+        });
+      } else {
+        console.error("Failed to load indexed documents", documentsResult.reason);
+      }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: `Document "${data.name || file.name}" uploaded successfully.`,
-        },
-      ]);
-    } catch (err) {
-      console.error(err);
+      if (systemResult.status === "fulfilled") {
+        setSystemStatus(mapSystemStatus(systemResult.value));
+      } else {
+        console.error("Failed to load system status", systemResult.reason);
+      }
+    });
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Error uploading the document.",
-        },
-      ]);
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const pdfUrl = viewerDocId ? `${API_URL}/api/pdf/${viewerDocId}` : "";
+
+  const updateChat = (chatId: string, updater: (chat: ChatSession) => ChatSession) => {
+    setChats((currentChats) =>
+      currentChats.map((chat) => (chat.id === chatId ? updater(chat) : chat)),
+    );
+  };
+
+  const setActiveChatDocument = (docId: string | null) => {
+    if (!activeChat) return;
+
+    updateChat(activeChat.id, (chat) => ({
+      ...chat,
+      activeDocId: docId,
+      updatedAt: Date.now(),
+    }));
+
+    setViewerDocId(docId);
+    setSelectedSource(null);
+  };
+
+  const startNewChat = () => {
+    const newChat = createChat();
+    setChats((currentChats) => [newChat, ...currentChats]);
+    setActiveChatId(newChat.id);
+    setViewerDocId(null);
+    setSelectedSource(null);
+    setInput("");
+  };
+
+  const streamAssistantResponse = async (
+    chatId: string,
+    messageId: string,
+    fullText: string,
+    sources: Source[],
+  ) => {
+    const step = fullText.length > 320 ? 3 : 1;
+    let index = step;
+
+    while (index < fullText.length) {
+      const nextSlice = fullText.slice(0, index);
+
+      updateChat(chatId, (chat) => ({
+        ...chat,
+        updatedAt: Date.now(),
+        messages: chat.messages.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                content: nextSlice,
+                sources: index >= fullText.length ? sources : [],
+                streaming: index < fullText.length,
+              }
+            : message,
+        ),
+      }));
+
+      await new Promise((resolve) => window.setTimeout(resolve, 14));
+      index += step;
+    }
+
+    updateChat(chatId, (chat) => ({
+      ...chat,
+      updatedAt: Date.now(),
+      messages: chat.messages.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              content: fullText,
+              sources,
+              streaming: false,
+            }
+          : message,
+      ),
+    }));
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!activeChat) {
+      return;
+    }
+
+    const targetChatId = activeChat.id;
+    setUploading(true);
+
+    try {
+      const data = await uploadPdf(file);
+      const nextDocument = mapApiDocument(data);
+
+      if (!data.doc_id) {
+        updateChat(targetChatId, (chat) => ({
+          ...chat,
+          updatedAt: Date.now(),
+          messages: [
+            ...chat.messages,
+            createAssistantMessage(
+              "The upload finished, but no valid document id came back.",
+            ),
+          ],
+        }));
+        return;
+      }
+
+      setDocuments((currentDocuments) => {
+        return mergeDocuments(currentDocuments, [nextDocument]);
+      });
+
+      updateChat(targetChatId, (chat) => ({
+        ...chat,
+        activeDocId: data.doc_id,
+        title: chat.title === "New conversation" ? data.name || file.name : chat.title,
+        updatedAt: Date.now(),
+        messages: [
+          ...chat.messages,
+          createAssistantMessage(
+            `"${data.name || file.name}" indexed with ${data.chunks} chunks across ${data.pages} pages. ${data.vector_ready ? "Vector retrieval is ready." : "Lexical fallback is active for this document."}`,
+          ),
+        ],
+      }));
+
+      setSystemStatus((currentStatus) =>
+        currentStatus
+          ? {
+              ...currentStatus,
+              documentsIndexed: Math.max(currentStatus.documentsIndexed, documents.length + 1),
+              workspaceDataAvailable: true,
+            }
+          : currentStatus,
+      );
+      setViewerDocId(data.doc_id);
+      setSelectedSource(null);
+    } catch (error) {
+      console.error(error);
+
+      updateChat(targetChatId, (chat) => ({
+        ...chat,
+        updatedAt: Date.now(),
+        messages: [
+          ...chat.messages,
+          createAssistantMessage(
+            error instanceof Error ? error.message : "There was an error uploading the document.",
+          ),
+        ],
+      }));
     } finally {
       setUploading(false);
     }
   };
 
-  // =========================
-  // SEND QUESTION
-  // =========================
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
 
-    if (!activeDoc) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Upload a document before asking questions.",
-        },
-      ]);
+    event.target.value = "";
+  };
+
+  const handleSelectSource = (source: Source) => {
+    const targetDocId = source.doc_id || activeChat?.activeDocId || null;
+
+    setSelectedSource({
+      ...source,
+      bbox: source.bbox ? [...source.bbox] : undefined,
+      line_boxes: source.line_boxes?.map((box) => [...box]) ?? undefined,
+    });
+    setViewerDocId(targetDocId);
+    setPdfFocusToken((current) => current + 1);
+
+    if (!isDesktop) {
+      setPdfOpen(true);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() || loading || !activeChat) return;
+
+    if (!activeChat.activeDocId) {
+      updateChat(activeChat.id, (chat) => ({
+        ...chat,
+        updatedAt: Date.now(),
+        messages: [
+          ...chat.messages,
+          createAssistantMessage("Select or upload a document before asking questions."),
+        ],
+      }));
       return;
     }
 
-    const question = input;
+    const question = input.trim();
+    const targetChatId = activeChat.id;
+    const targetDocId = activeChat.activeDocId;
+    if (!targetDocId) {
+      return;
+    }
+    const placeholderId = createId();
+    const history: ConversationTurn[] = activeChat.messages
+      .filter((message) => !message.streaming && message.content.trim())
+      .slice(-6)
+      .map((message) => ({
+        role: message.role,
+        content: message.content,
+      }));
 
     setInput("");
     setLoading(true);
 
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: question },
-      { role: "assistant", content: "...", sources: [] },
-    ]);
+    updateChat(targetChatId, (chat) => ({
+      ...chat,
+      title: chat.title === "New conversation" ? question.slice(0, 40) : chat.title,
+      updatedAt: Date.now(),
+      messages: [
+        ...chat.messages,
+        { id: createId(), role: "user", content: question },
+        { id: placeholderId, role: "assistant", content: "", streaming: true, sources: [] },
+      ],
+    }));
 
     try {
-      const data = await askQuestion(question, activeDoc);
-
-      console.log("ASK RESPONSE:", data);
-
-      const fullText = data.answer || "No response from the server.";
-      const sources = data.sources || [];
-
-      let i = 0;
-
-      const interval = setInterval(() => {
-        i++;
-
-        setMessages((prev) => {
-          const updated = [...prev];
-
-          updated[updated.length - 1] = {
-            role: "assistant",
-            content: fullText.slice(0, i),
-            sources: i >= fullText.length ? sources : [],
-          };
-
-          return updated;
-        });
-
-        if (i >= fullText.length) {
-          clearInterval(interval);
-        }
-      }, 15);
+      const data = await askQuestion(question, targetDocId, history);
+      await streamAssistantResponse(
+        targetChatId,
+        placeholderId,
+        data.answer || "No response from the server.",
+        data.sources || [],
+      );
     } catch (error) {
       console.error(error);
 
-      setMessages((prev) => {
-        const updated = [...prev];
-
-        updated[updated.length - 1] = {
-          role: "assistant",
-          content: "Error fetching the answer.",
-        };
-
-        return updated;
-      });
+      updateChat(targetChatId, (chat) => ({
+        ...chat,
+        updatedAt: Date.now(),
+        messages: chat.messages.map((message) =>
+          message.id === placeholderId
+            ? { ...message, content: "There was an error fetching the answer.", streaming: false }
+            : message,
+        ),
+      }));
     } finally {
       setLoading(false);
     }
   };
 
+  if (!activeChat) return null;
+
   return (
-    <div className="flex h-screen bg-neutral-900 text-white">
-      <Sidebar
-        documents={documents}
-        activeDoc={activeDoc}
-        uploading={uploading}
-        pendingFileName={pendingFileName}
-        onUpload={handleFileUpload}
-        onNewChat={() => {
-          setMessages([
-            {
-              role: "assistant",
-              content: "New chat started. Upload a document.",
-            },
-          ]);
-          setActiveDoc(null);
-        }}
-        onSelectDoc={(docId) => {
-          console.log("DOC CLICK:", docId);
-          setActiveDoc(docId);
-        }}
-      />
+    <div className="h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--app-foreground)]">
+      <div className="flex h-full min-h-0 flex-col lg:flex-row">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf"
+          onChange={handleFileChange}
+          className="hidden"
+          disabled={uploading}
+        />
 
-      {/* CHAT */}
-      <main className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`max-w-2xl ${
-                msg.role === "user" ? "ml-auto text-right" : ""
-              }`}
-            >
-              <div
-                className={`p-3 rounded-lg ${
-                  msg.role === "user"
-                    ? "bg-blue-600"
-                    : "bg-neutral-700"
-                }`}
-              >
-                {msg.content}
+        <SidebarPanel
+          activeChatId={activeChat.id}
+          activeDocId={activeChat.activeDocId}
+          activeNav={activeNav}
+          chats={chats}
+          documents={documents}
+          systemStatus={systemStatus}
+          uploading={uploading}
+          onChangeNav={setActiveNav}
+          onNewChat={startNewChat}
+          onOpenUpload={() => fileInputRef.current?.click()}
+          onSelectChat={(chatId) => {
+            const nextChat = chats.find((chat) => chat.id === chatId);
+            setActiveChatId(chatId);
+            setViewerDocId(nextChat?.activeDocId ?? null);
+            setSelectedSource(null);
+          }}
+          onSelectDocument={(docId) => setActiveChatDocument(docId)}
+        />
 
-                {/* SOURCES */}
-                {msg.sources && msg.sources.length > 0 && (
-                  <div className="mt-3 text-sm text-gray-300 space-y-1">
-                    <p className="font-semibold">Sources:</p>
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_26%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_22%)] lg:flex-row">
+          <ChatWorkspace
+            activeChat={activeChat}
+            activeDocument={activeDocument}
+            documentsCount={documents.length}
+            input={input}
+            isDesktop={isDesktop}
+            loading={loading}
+            systemStatus={systemStatus}
+            viewerDocId={viewerDocId}
+            onChangeInput={setInput}
+            onOpenPdf={() => setPdfOpen(true)}
+            onOpenUpload={() => fileInputRef.current?.click()}
+            onSelectSource={handleSelectSource}
+            onSend={handleSend}
+            chatEndRef={chatEndRef}
+          />
 
-                    {msg.sources.map((s) => (
-                      <div
-                        key={s.id}
-                        onClick={() => {
-                          console.log("SOURCE CLICKED:", s);
+          <ViewerPanel
+            documents={documents}
+            focusToken={pdfFocusToken}
+            pdfUrl={pdfUrl}
+            selectedSource={selectedSource}
+            viewerDocId={viewerDocId}
+            onClearFocus={() => {
+              setSelectedSource(null);
+              setPdfFocusToken((current) => current + 1);
+            }}
+          />
+        </main>
+      </div>
 
-                          setSelectedSource({
-                            ...s,
-                            bbox: s.bbox ? [...s.bbox] : undefined,
-                            line_boxes: s.line_boxes?.map((box) => [...box]) ?? undefined,
-                          });
-                          setModalDocId(s.doc_id || activeDoc);
-                          setPdfFocusToken((current) => current + 1);
-                          setPdfOpen(true);
-                        }}
-                        className="bg-neutral-800 p-2 rounded text-xs cursor-pointer hover:bg-neutral-700 transition"
-                      >
-                        [{s.id}]{" "}
-                        {s.score && `(${s.score.toFixed(2)})`}{" "}
-                        {s.text}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* INPUT */}
-        <div className="p-4 border-t border-neutral-700">
-          <div className="flex gap-2 max-w-2xl mx-auto">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={
-                activeDoc
-                  ? "Ask something about the document..."
-                  : "Upload a PDF first..."
-              }
-              className="flex-1 p-3 rounded-lg bg-neutral-800 border border-neutral-700 focus:outline-none"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSend();
-              }}
-              disabled={loading}
-            />
-
-            <button
-              onClick={handleSend}
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-500 px-4 rounded-lg disabled:opacity-50"
-            >
-              {loading ? "..." : "Send"}
-            </button>
-          </div>
-        </div>
-      </main>
-
-      {/* MODAL PDF */}
       <PdfModal
-        open={pdfOpen}
-        onClose={() => {
-          console.log("MODAL CLOSED");
-          setPdfOpen(false);
-        }}
+        open={pdfOpen && !isDesktop}
+        onClose={() => setPdfOpen(false)}
         fileUrl={pdfUrl}
         highlight={selectedSource}
         focusToken={pdfFocusToken}
