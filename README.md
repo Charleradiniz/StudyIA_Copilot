@@ -24,6 +24,7 @@ This repository is meant to showcase more than a prompt wrapper:
 - frontend session persistence for chats and selected documents
 - backend-powered document catalog sync on frontend load
 - system readiness signals for LLM, embeddings, reranker, and retrieval mode
+- automated backend API contract tests for upload, ask, catalog, and PDF serving
 - observability logs for retrieval and generation timings
 
 ## Stack
@@ -146,6 +147,23 @@ Start the frontend:
 npm run dev
 ```
 
+## Validation
+
+Backend API contract tests:
+
+```bash
+cd backend
+venv\Scripts\python.exe -m unittest discover -s tests -p "test*.py" -v
+```
+
+Frontend quality checks:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+```
+
 ## Observability
 
 The backend now logs the most useful steps of the RAG pipeline:
@@ -199,11 +217,22 @@ That flow demonstrates:
 - Follow-up questions are contextualized with recent chat history so short prompts can still retrieve the right chunks.
 - The frontend persists sessions locally, which makes the product feel continuous across refreshes.
 - Logs capture retrieval and generation timing, which is useful for latency analysis and debugging retrieval quality.
+- The backend exposes document catalog and runtime readiness endpoints so the UI can surface operational state instead of hiding infrastructure assumptions.
+- The repository includes API contract tests for the core user flow, which makes the project stronger in technical interviews and safer to evolve.
+
+## Portfolio Signals
+
+What makes this repository stronger than a typical AI demo:
+- the product explains where answers came from instead of only generating text
+- the backend has explicit runtime modes and communicates trade-offs between local depth and free-tier deployment
+- the frontend exposes technical system state in a user-friendly way, which helps both debugging and demo storytelling
+- the PDF viewer is integrated into the retrieval flow with direct evidence jumps and highlights
+- the core backend flow is covered by automated tests, not only manual demo steps
 
 ## Current Gaps
 
 The project is already strong for a portfolio, but the next steps that would raise employability even more are:
-- automated backend and frontend tests
+- frontend component or e2e tests
 - structured evaluation for retrieval quality
 - session persistence in a real database
 - provider abstraction for Gemini and Ollama
