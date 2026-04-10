@@ -72,6 +72,14 @@ COMPARISON_PHRASES = (
     "how do",
     "what is the relationship",
 )
+VECTOR_SEARCH_K = 12
+LEXICAL_SEARCH_K = 8
+PER_DOC_RESULT_LIMIT = 12
+MERGED_RESULT_LIMIT = 36
+RERANK_TOP_K = 12
+DEFAULT_SOURCE_COUNT = 5
+DEFAULT_CONTEXT_COUNT = 8
+NEIGHBOR_OFFSETS = (1, -1, 2, -2)
 
 
 class AskRequest(BaseModel):
@@ -236,6 +244,113 @@ def dedupe_chunks(chunks: list[dict]) -> list[dict]:
     return unique_chunks
 
 
+def ensure_source_count(
+    selected_chunks: list[dict],
+    fallback_chunks: list[dict],
+    target_count: int,
+) -> list[dict]:
+    if target_count <= 0:
+        return []
+
+    combined_chunks = []
+    seen_signatures = set()
+
+    for chunk in [*(selected_chunks or []), *(fallback_chunks or [])]:
+        signature = chunk_signature(chunk)
+        if signature in seen_signatures:
+            continue
+
+        seen_signatures.add(signature)
+        combined_chunks.append(chunk)
+
+        if len(combined_chunks) >= target_count:
+            break
+
+    return combined_chunks
+
+
+def get_chunk_identifier(chunk: dict):
+    if chunk.get("chunk_id") is not None:
+        return chunk.get("chunk_id")
+
+    return chunk.get("id")
+
+
+def get_context_target_count(prompt_mode: str) -> int:
+    if prompt_mode == "grounded":
+        return 6
+
+    return DEFAULT_CONTEXT_COUNT
+
+
+def get_fallback_chunk_count(prompt_mode: str) -> int:
+    if prompt_mode == "comparison":
+        return 3
+    if prompt_mode == "multi_document":
+        return 2
+
+    return 5
+
+
+def build_neighbor_results(docs: list[dict], seed_chunks: list[dict], limit: int = 12) -> list[dict]:
+    if not seed_chunks or limit <= 0:
+        return []
+
+    docs_by_id = {
+        doc.get("doc_id"): doc
+        for doc in docs
+        if doc.get("doc_id") and doc.get("documents")
+    }
+    chunk_positions_by_doc = {}
+    neighbor_results = []
+    seen_signatures = {chunk_signature(chunk) for chunk in seed_chunks}
+
+    for seed_chunk in seed_chunks:
+        doc_id = seed_chunk.get("doc_id")
+        doc = docs_by_id.get(doc_id)
+        if not doc:
+            continue
+
+        documents = doc.get("documents", [])
+        if not documents:
+            continue
+
+        chunk_positions = chunk_positions_by_doc.setdefault(
+            doc_id,
+            {
+                get_chunk_identifier(chunk): index
+                for index, chunk in enumerate(documents)
+                if get_chunk_identifier(chunk) is not None
+            },
+        )
+        seed_identifier = get_chunk_identifier(seed_chunk)
+        seed_position = chunk_positions.get(seed_identifier)
+        if seed_position is None:
+            continue
+
+        for offset in NEIGHBOR_OFFSETS:
+            neighbor_position = seed_position + offset
+            if neighbor_position < 0 or neighbor_position >= len(documents):
+                continue
+
+            neighbor_chunk = enrich_chunk(
+                documents[neighbor_position],
+                doc,
+                rank=neighbor_position + 1,
+            )
+            signature = chunk_signature(neighbor_chunk)
+            if signature in seen_signatures:
+                continue
+
+            seen_signatures.add(signature)
+            neighbor_results.append(neighbor_chunk)
+
+            if len(neighbor_results) >= limit:
+                return neighbor_results
+
+    return neighbor_results
+
+
 # =========================
 # CONTEXT
 # =========================
@@ -367,7 +482,7 @@ def run_search(doc: dict, query: str):
             model=model,
             index=doc["index"],
             documents=doc["documents"],
-            k=10,
+            k=VECTOR_SEARCH_K,
         )
     except Exception as error:
         print("SEARCH ERROR:", error)
@@ -472,9 +587,9 @@ def gather_results_for_doc(
         return []
 
     vector_results = run_search(doc, effective_question)
-    lexical_results = lexical_search(documents, effective_question, k=6)
+    lexical_results = lexical_search(documents, effective_question, k=LEXICAL_SEARCH_K)
     original_lexical_results = (
-        lexical_search(documents, question, k=6)
+        lexical_search(documents, question, k=LEXICAL_SEARCH_K)
         if effective_question != question
         else []
     )
@@ -483,7 +598,7 @@ def gather_results_for_doc(
         vector_results,
         lexical_results,
         original_lexical_results,
-        limit=8,
+        limit=PER_DOC_RESULT_LIMIT,
     )
 
     if not doc_results and is_summary_query(question):
@@ -524,18 +639,14 @@ def interleave_results(results_by_doc: list[tuple[str, list[dict]]], limit: int 
 
 def build_fallback_results(docs: list[dict], prompt_mode: str) -> list[dict]:
     per_doc_fallback = []
+    fallback_chunk_count = get_fallback_chunk_count(prompt_mode)
 
     for doc in docs:
         documents = doc.get("documents", [])
         if not documents:
             continue
 
-        if prompt_mode == "comparison":
-            fallback_chunks = first_chunks(documents, k=2)
-        elif prompt_mode == "multi_document":
-            fallback_chunks = first_chunks(documents, k=1)
-        else:
-            fallback_chunks = first_chunks(documents, k=3)
+        fallback_chunks = first_chunks(documents, k=fallback_chunk_count)
 
         per_doc_fallback.append((
             doc.get("doc_id"),
@@ -559,7 +670,7 @@ def gather_results(
             gather_results_for_doc(doc, question, effective_question, prompt_mode),
         ))
 
-    merged_results = dedupe_chunks(interleave_results(results_by_doc, limit=24))
+    merged_results = dedupe_chunks(interleave_results(results_by_doc, limit=MERGED_RESULT_LIMIT))
 
     if merged_results:
         return merged_results
@@ -653,23 +764,51 @@ async def ask_question(
                 "sources": [],
             }
 
-        candidate_chunks = [chunk for chunk in all_results[:24] if chunk.get("text")]
+        candidate_chunks = [chunk for chunk in all_results[:MERGED_RESULT_LIMIT] if chunk.get("text")]
         rerank_started_at = perf_counter()
         reranked_chunks = (
-            rerank(effective_question, candidate_chunks, top_k=8)
+            rerank(effective_question, candidate_chunks, top_k=RERANK_TOP_K)
             if candidate_chunks and RAG_MODE == "full"
-            else candidate_chunks[:8]
+            else candidate_chunks[:RERANK_TOP_K]
         )
-        top_chunks = apply_document_diversity(
-            reranked_chunks,
-            top_k=6 if len(docs) > 1 else 5,
+        fallback_chunks = build_fallback_results(docs, prompt_mode)
+        neighbor_chunks = build_neighbor_results(
+            docs,
+            reranked_chunks or candidate_chunks,
+            limit=max(DEFAULT_CONTEXT_COUNT, DEFAULT_SOURCE_COUNT),
+        )
+        available_chunk_count = len(
+            merge_unique_results(
+                candidate_chunks,
+                neighbor_chunks,
+                fallback_chunks,
+            )
+        )
+        desired_source_count = min(DEFAULT_SOURCE_COUNT, available_chunk_count)
+        desired_context_count = min(
+            get_context_target_count(prompt_mode),
+            available_chunk_count,
         )
 
-        if not top_chunks:
-            top_chunks = build_fallback_results(docs, prompt_mode)[:6 if len(docs) > 1 else 5]
+        context_chunks = apply_document_diversity(
+            reranked_chunks,
+            top_k=max(desired_context_count, 1),
+        )
+        context_chunks = ensure_source_count(context_chunks, reranked_chunks, desired_context_count)
+        context_chunks = ensure_source_count(context_chunks, candidate_chunks, desired_context_count)
+        context_chunks = ensure_source_count(context_chunks, neighbor_chunks, desired_context_count)
+        context_chunks = ensure_source_count(context_chunks, fallback_chunks, desired_context_count)
+
+        source_chunks = apply_document_diversity(
+            context_chunks,
+            top_k=max(desired_source_count, 1),
+        )
+        source_chunks = ensure_source_count(source_chunks, context_chunks, desired_source_count)
+        source_chunks = ensure_source_count(source_chunks, neighbor_chunks, desired_source_count)
+        source_chunks = ensure_source_count(source_chunks, fallback_chunks, desired_source_count)
         rerank_ms = round((perf_counter() - rerank_started_at) * 1000, 2)
 
-        if not top_chunks:
+        if not context_chunks or not source_chunks:
             logger.info(
                 "ask_no_top_chunks doc_ids=%s prompt_mode=%s question=%r effective_question=%r history_turns=%s retrieval_ms=%s rerank_ms=%s",
                 requested_doc_ids or None,
@@ -686,7 +825,7 @@ async def ask_question(
                 "sources": [],
             }
 
-        context = build_context(top_chunks)
+        context = build_context(context_chunks)
         llm_started_at = perf_counter()
         answer = generate_answer(
             question,
@@ -706,7 +845,7 @@ async def ask_question(
             effective_question[:300],
             len(data.history or []),
             len(all_results),
-            len(top_chunks),
+            len(source_chunks),
             retrieval_ms,
             rerank_ms,
             llm_ms,
@@ -716,7 +855,7 @@ async def ask_question(
         return {
             "question": question,
             "answer": answer,
-            "sources": format_sources(top_chunks),
+            "sources": format_sources(source_chunks),
         }
 
     except Exception as error:

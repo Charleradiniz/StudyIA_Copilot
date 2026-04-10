@@ -109,19 +109,35 @@ Core rules:
 - If the answer requires inference, make a careful inference and make it explicit.
 - Prefer the best grounded answer available instead of saying that no information was found when relevant clues exist.
 - If the evidence is partial, explain what is supported and what remains uncertain.
+- Do not be artificially brief when the context supports a fuller explanation.
+- Avoid vague summaries. Include concrete facts, examples, relationships, and patterns from the excerpts.
+""".strip()
+
+COMMON_RESPONSE_REQUIREMENTS = """
+Response requirements:
+- Give a developed answer, not a one-line summary, unless the user explicitly asked for a very short response.
+- When the context is rich, aim for roughly 2 to 5 short paragraphs or a compact structured comparison.
+- If enough evidence exists, connect 3 to 5 grounded details instead of stopping after the first point.
+- Weave together multiple grounded details from the excerpts instead of repeating generic statements.
+- Use the document labels naturally when switching sources or contrasting evidence.
+- If several relevant excerpts exist, make use of them instead of relying on only one or two.
+- Do not stop after naming a topic. Explain what it means, why it matters, or how the evidence connects.
 """.strip()
 
 PROMPT_MODES = {
     "grounded": """
 Mode: grounded single-document or focused answer.
 - Prioritize the most relevant evidence.
-- Keep the answer direct and grounded in the provided excerpts.
+- Explain the main point first, then add the most useful supporting details.
+- If the excerpts support nuance, include that nuance instead of stopping at a shallow summary.
 """.strip(),
     "multi_document": """
 Mode: multi-document synthesis.
 - Combine evidence across the labeled documents before answering.
 - Explain how the documents connect when the answer depends on more than one source.
 - Mention the document labels when switching between sources.
+- Build a cohesive synthesis rather than a list of isolated observations.
+- Cover the strongest contribution from each relevant document before concluding.
 """.strip(),
     "comparison": """
 Mode: comparison and cross-document reasoning.
@@ -129,6 +145,8 @@ Mode: comparison and cross-document reasoning.
 - Highlight similarities, differences, relationships, and important patterns.
 - Mention the document labels when presenting each part of the comparison.
 - If one document has weaker evidence, provide a partial comparison instead of refusing to answer.
+- When possible, compare several grounded points rather than stopping after one or two.
+- Start with the overall comparison, then support it with concrete contrasts and overlaps.
 """.strip(),
 }
 
@@ -161,6 +179,8 @@ def build_prompt(
 
     return f"""
 {BASE_INSTRUCTIONS}
+
+{COMMON_RESPONSE_REQUIREMENTS}
 
 {build_mode_instructions(prompt_mode)}
 
@@ -212,6 +232,8 @@ def generate_answer(
                 ],
                 "generationConfig": {
                     "temperature": 0.15,
+                    "topP": 0.9,
+                    "maxOutputTokens": 1400,
                 },
             },
             timeout=300,

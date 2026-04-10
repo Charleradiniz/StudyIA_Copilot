@@ -18,6 +18,7 @@ from app.routes import auth as auth_route
 from app.routes import pdf as pdf_route
 from app.routes import system as system_route
 from app.routes import upload as upload_route
+from app.services import llm as llm_module
 from app.services import query as query_module
 from app.services import storage as storage_module
 
@@ -169,6 +170,52 @@ class ApiContractTests(unittest.TestCase):
     def auth_headers(self, token: str) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}"}
 
+    def save_document_fixture(
+        self,
+        *,
+        user_id: str,
+        doc_id: str,
+        filename: str,
+        texts: list[str],
+    ) -> None:
+        documents = [
+            {
+                "id": index,
+                "text": text,
+                "doc_id": doc_id,
+                "file_id": doc_id,
+                "page": index,
+                "bbox": [0, 0, 100, 100],
+                "line_boxes": [[0, 0, 100, 100]],
+                "char_length": len(text),
+            }
+            for index, text in enumerate(texts)
+        ]
+        metadata = {
+            "doc_id": doc_id,
+            "user_id": user_id,
+            "filename": filename,
+            "path": str(self.upload_path / user_id / f"{doc_id}.pdf"),
+            "chunk_count": len(documents),
+            "page_count": len(documents),
+            "rag_mode": "lite",
+            "vector_ready": False,
+            "uploaded_at": "2026-01-01T00:00:00+00:00",
+            "preview": (documents[0]["text"] if documents else "")[:220],
+        }
+
+        storage_module.save_document(
+            doc_id,
+            documents,
+            None,
+            metadata=metadata,
+            user_id=user_id,
+        )
+        query_module.DOCUMENTS.pop(
+            query_module.get_document_cache_key(user_id, doc_id),
+            None,
+        )
+
     def test_register_and_login_return_a_valid_session_payload(self) -> None:
         register_payload = self.register_user()
         login_response = self.client.post(
@@ -191,6 +238,76 @@ class ApiContractTests(unittest.TestCase):
         )
         self.assertEqual(me_response.status_code, 200, me_response.text)
         self.assertEqual(me_response.json()["user"]["full_name"], "Charles Study")
+
+    def test_prompt_instructions_encourage_more_developed_answers(self) -> None:
+        prompt = llm_module.build_prompt(
+            "Compare the documents",
+            "[Doc A]\nExcerpt 1:\nAlpha\n\n[Doc B]\nExcerpt 1:\nBeta",
+            history=[],
+            prompt_mode="comparison",
+        )
+
+        self.assertIn("2 to 5 short paragraphs", prompt)
+        self.assertIn("If several relevant excerpts exist", prompt)
+        self.assertIn("compare several grounded points", prompt.lower())
+
+    def test_ensure_source_count_backfills_up_to_five_sources(self) -> None:
+        primary = [
+            {"doc_id": "doc-1", "chunk_id": 1, "page": 0, "text": "alpha"},
+            {"doc_id": "doc-1", "chunk_id": 2, "page": 0, "text": "beta"},
+        ]
+        fallback = [
+            {"doc_id": "doc-1", "chunk_id": 2, "page": 0, "text": "beta"},
+            {"doc_id": "doc-1", "chunk_id": 3, "page": 1, "text": "gamma"},
+            {"doc_id": "doc-2", "chunk_id": 4, "page": 0, "text": "delta"},
+            {"doc_id": "doc-2", "chunk_id": 5, "page": 1, "text": "epsilon"},
+            {"doc_id": "doc-3", "chunk_id": 6, "page": 0, "text": "zeta"},
+        ]
+
+        enriched = query_module.ensure_source_count(primary, fallback, target_count=5)
+
+        self.assertEqual(len(enriched), 5)
+        self.assertEqual(enriched[0]["text"], "alpha")
+        self.assertEqual(enriched[1]["text"], "beta")
+        self.assertEqual([chunk["text"] for chunk in enriched[2:]], ["gamma", "delta", "epsilon"])
+
+    def test_ask_backfills_context_and_sources_when_retrieval_is_sparse(self) -> None:
+        auth = self.register_user()
+        headers = self.auth_headers(auth["token"])
+        doc_id = "deep-context-doc"
+        self.save_document_fixture(
+            user_id=auth["user"]["id"],
+            doc_id=doc_id,
+            filename="deep-context.pdf",
+            texts=[
+                "Transit hubs coordinate regional buses and urban trains while concentrating passenger flow across connected districts and public access corridors.",
+                "Stations also include ticketing corridors, waiting zones, and platform circulation details that explain how travelers move through the network.",
+                "Operations planning emphasizes timing windows, signage, staff coordination, and crowd management during peaks and service changes.",
+                "Secondary transit hubs integrate bicycle storage and bus transfers for last-mile access while extending the reach of the larger transport system.",
+                "Wayfinding design keeps entrances legible, reduces transfer friction, and supports accessibility when multiple services meet in one place.",
+                "Service summaries explain reliability metrics, maintenance schedules, and practical improvements that keep the overall experience consistent.",
+            ],
+        )
+
+        ask_response = self.client.post(
+            "/api/ask",
+            headers=headers,
+            json={
+                "question": "transit hubs",
+                "doc_id": doc_id,
+                "history": [],
+            },
+        )
+
+        self.assertEqual(ask_response.status_code, 200, ask_response.text)
+        payload = ask_response.json()
+        last_llm_call = self.llm_calls[-1]
+
+        self.assertEqual(payload["answer"], "Mocked grounded answer.")
+        self.assertEqual(len(payload["sources"]), 5)
+        self.assertTrue(all(source["doc_id"] == doc_id for source in payload["sources"]))
+        self.assertGreaterEqual(last_llm_call["context"].count("Excerpt "), 5)
+        self.assertIn("[Deep Context]", last_llm_call["context"])
 
     def test_upload_populates_catalog_and_runtime_status(self) -> None:
         auth = self.register_user()
