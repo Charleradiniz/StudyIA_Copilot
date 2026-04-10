@@ -185,6 +185,8 @@ export default function App() {
   const [pdfOpen, setPdfOpen] = useState(false);
   const [pdfFocusToken, setPdfFocusToken] = useState(0);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
+  const [clearingChats, setClearingChats] = useState(false);
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const [clearingDocuments, setClearingDocuments] = useState(false);
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -278,6 +280,17 @@ export default function App() {
     );
   };
 
+  const activateChat = (chat: ChatSession, options?: { clearInput?: boolean }) => {
+    setActiveChatId(chat.id);
+    setViewerDocId(chat.activeDocId ?? null);
+    setSelectedSource(null);
+    setPdfOpen(false);
+
+    if (options?.clearInput) {
+      setInput("");
+    }
+  };
+
   const setActiveChatDocument = (docId: string | null) => {
     if (!activeChat) return;
 
@@ -294,10 +307,29 @@ export default function App() {
   const startNewChat = () => {
     const newChat = createChat();
     setChats((currentChats) => [newChat, ...currentChats]);
-    setActiveChatId(newChat.id);
-    setViewerDocId(null);
-    setSelectedSource(null);
-    setInput("");
+    activateChat(newChat, { clearInput: true });
+  };
+
+  const applyRemovedChats = (removedChatIds: string[]) => {
+    if (removedChatIds.length === 0) {
+      return;
+    }
+
+    const removedChats = new Set(removedChatIds);
+    const remainingChats = chats.filter((chat) => !removedChats.has(chat.id));
+
+    if (remainingChats.length === 0) {
+      const replacementChat = createChat();
+      setChats([replacementChat]);
+      activateChat(replacementChat, { clearInput: true });
+      return;
+    }
+
+    setChats(remainingChats);
+
+    if (removedChats.has(activeChatId)) {
+      activateChat(remainingChats[0], { clearInput: true });
+    }
   };
 
   const applyRemovedDocuments = (removedDocIds: string[]) => {
@@ -641,6 +673,49 @@ export default function App() {
     }
   };
 
+  const handleDeleteChat = (chatId: string) => {
+    const targetChat = chats.find((chat) => chat.id === chatId);
+    if (!targetChat) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `Delete "${targetChat.title}"? This removes the full conversation history from this browser.`,
+    );
+    if (!shouldDelete) {
+      return;
+    }
+
+    setDeletingChatId(chatId);
+
+    try {
+      applyRemovedChats([chatId]);
+    } finally {
+      setDeletingChatId(null);
+    }
+  };
+
+  const handleClearChats = () => {
+    if (chats.length === 0) {
+      return;
+    }
+
+    const shouldClear = window.confirm(
+      `Delete all ${chats.length} conversation${chats.length === 1 ? "" : "s"}? This clears the local chat history and starts a fresh session.`,
+    );
+    if (!shouldClear) {
+      return;
+    }
+
+    setClearingChats(true);
+
+    try {
+      applyRemovedChats(chats.map((chat) => chat.id));
+    } finally {
+      setClearingChats(false);
+    }
+  };
+
   if (!activeChat) return null;
 
   return (
@@ -660,21 +735,25 @@ export default function App() {
           activeDocId={activeChat.activeDocId}
           activeNav={activeNav}
           chats={chats}
+          clearingChats={clearingChats}
           clearingDocuments={clearingDocuments}
+          deletingChatId={deletingChatId}
           deletingDocId={deletingDocId}
           documents={documents}
           systemStatus={systemStatus}
           uploading={uploading}
           onChangeNav={setActiveNav}
+          onClearChats={handleClearChats}
           onClearDocuments={handleClearDocuments}
+          onDeleteChat={handleDeleteChat}
           onDeleteDocument={handleDeleteDocument}
           onNewChat={startNewChat}
           onOpenUpload={() => fileInputRef.current?.click()}
           onSelectChat={(chatId) => {
             const nextChat = chats.find((chat) => chat.id === chatId);
-            setActiveChatId(chatId);
-            setViewerDocId(nextChat?.activeDocId ?? null);
-            setSelectedSource(null);
+            if (nextChat) {
+              activateChat(nextChat);
+            }
           }}
           onSelectDocument={(docId) => setActiveChatDocument(docId)}
         />

@@ -54,7 +54,7 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        question: "What makes this product portfolio-ready?",
+        question: "Why portfolio-ready?",
         answer: "Grounded answer.",
         sources: [
           {
@@ -93,6 +93,7 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
   });
 
   await page.goto("/");
+  page.on("dialog", (dialog) => dialog.accept());
 
   await expect(page.getByText("Research workspace")).toBeVisible();
   await expect(page.getByText("Platform readiness")).toBeVisible();
@@ -108,7 +109,7 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
 
   await page
     .getByRole("textbox", { name: "Message" })
-    .fill("What makes this product portfolio-ready?");
+    .fill("Why portfolio-ready?");
   await page.getByRole("button", { name: "Send" }).click();
 
   await expect(page.getByText("Grounded answer.")).toBeVisible();
@@ -118,7 +119,13 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
 
   await expect(page.getByText("Focused on page 1")).toBeVisible();
 
-  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Delete chat Study Flow.pdf" }).click();
+
+  await expect(page.getByRole("heading", { name: "New conversation" })).toBeVisible();
+  await expect(
+    page.getByText("Welcome back. Upload a PDF, pick a document, and ask anything about it."),
+  ).toBeVisible();
+
   await page.getByRole("button", { name: "Delete Study Flow.pdf" }).click();
 
   await expect(page.getByText("Upload your first PDF to build the workspace.")).toBeVisible();

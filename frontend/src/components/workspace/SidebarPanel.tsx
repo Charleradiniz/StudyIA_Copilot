@@ -8,11 +8,15 @@ type Props = {
   chats: ChatSession[];
   documents: AppDocument[];
   systemStatus: SystemStatus | null;
+  clearingChats: boolean;
   clearingDocuments: boolean;
+  deletingChatId: string | null;
   deletingDocId: string | null;
   uploading: boolean;
   onChangeNav: (nav: "workspace" | "documents" | "activity") => void;
+  onClearChats: () => void;
   onClearDocuments: () => void;
+  onDeleteChat: (chatId: string) => void;
   onDeleteDocument: (docId: string) => void;
   onNewChat: () => void;
   onOpenUpload: () => void;
@@ -25,19 +29,28 @@ export default function SidebarPanel({
   activeDocId,
   activeNav,
   chats,
+  clearingChats,
   clearingDocuments,
+  deletingChatId,
   deletingDocId,
   documents,
   systemStatus,
   uploading,
   onChangeNav,
+  onClearChats,
   onClearDocuments,
+  onDeleteChat,
   onDeleteDocument,
   onNewChat,
   onOpenUpload,
   onSelectChat,
   onSelectDocument,
 }: Props) {
+  const hasMeaningfulHistory = (chat: ChatSession) =>
+    chat.messages.some((message) => message.role === "user");
+
+  const canManageChats = chats.length > 1 || chats.some(hasMeaningfulHistory);
+
   return (
     <aside className="w-full shrink-0 border-b border-white/10 bg-[var(--panel-strong)]/95 backdrop-blur lg:h-full lg:w-[300px] lg:border-b-0 lg:border-r xl:w-[320px]">
       <div className="flex h-full min-h-0 flex-col">
@@ -271,46 +284,79 @@ export default function SidebarPanel({
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-[var(--panel)] p-4">
-            <div className="mb-4">
-              <h2 className="text-sm font-semibold text-white">Chat history</h2>
-              <p className="text-xs text-[var(--muted-foreground)]">
-                Recent conversations stay one tap away
-              </p>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-white">Chat history</h2>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Recent conversations stay one tap away
+                </p>
+              </div>
+
+              {canManageChats && (
+                <button
+                  type="button"
+                  onClick={onClearChats}
+                  disabled={clearingChats || Boolean(deletingChatId)}
+                  className="rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1.5 text-[11px] font-medium text-rose-100 transition hover:border-rose-300/40 hover:bg-rose-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {clearingChats ? "Clearing..." : "Clear chats"}
+                </button>
+              )}
             </div>
 
             <div className="space-y-2">
               {chats.map((chat) => {
                 const linkedDocument = documents.find((doc) => doc.id === chat.activeDocId);
                 const isCurrent = chat.id === activeChatId;
+                const isDeleting = deletingChatId === chat.id;
+                const canDeleteChat = chats.length > 1 || hasMeaningfulHistory(chat);
 
                 return (
-                  <button
+                  <div
                     key={chat.id}
-                    type="button"
-                    onClick={() => onSelectChat(chat.id)}
                     className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                       isCurrent
                         ? "border-white/20 bg-white/[0.07]"
                         : "border-white/10 bg-transparent hover:border-white/15 hover:bg-white/[0.04]"
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-white">{chat.title}</p>
-                        <p className="mt-1 line-clamp-2 text-xs text-[var(--muted-foreground)]">
-                          {getChatPreview(chat.messages)}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-[11px] text-[var(--muted-foreground)]">
-                        {formatRelativeTime(chat.updatedAt)}
-                      </span>
-                    </div>
+                    <div className="flex items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() => onSelectChat(chat.id)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-white">{chat.title}</p>
+                            <p className="mt-1 line-clamp-2 text-xs text-[var(--muted-foreground)]">
+                              {getChatPreview(chat.messages)}
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-[11px] text-[var(--muted-foreground)]">
+                            {formatRelativeTime(chat.updatedAt)}
+                          </span>
+                        </div>
 
-                    <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--muted-foreground)]">
-                      <span>{chat.messages.length} messages</span>
-                      <span>{linkedDocument?.name ?? "No document linked"}</span>
+                        <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--muted-foreground)]">
+                          <span>{chat.messages.length} messages</span>
+                          <span>{linkedDocument?.name ?? "No document linked"}</span>
+                        </div>
+                      </button>
+
+                      {canDeleteChat && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteChat(chat.id)}
+                          disabled={clearingChats || isDeleting}
+                          aria-label={`Delete chat ${chat.title}`}
+                          className="shrink-0 rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1.5 text-[11px] font-medium text-rose-100 transition hover:border-rose-300/40 hover:bg-rose-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isDeleting ? "Deleting..." : "Delete"}
+                        </button>
+                      )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

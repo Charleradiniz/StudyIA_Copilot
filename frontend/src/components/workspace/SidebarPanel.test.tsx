@@ -54,11 +54,15 @@ describe("SidebarPanel", () => {
           documentsIndexed: 1,
           workspaceDataAvailable: true,
         }}
+        clearingChats={false}
         clearingDocuments={false}
+        deletingChatId={null}
         deletingDocId={null}
         uploading={false}
         onChangeNav={() => {}}
+        onClearChats={() => {}}
         onClearDocuments={() => {}}
+        onDeleteChat={() => {}}
         onDeleteDocument={() => {}}
         onNewChat={() => {}}
         onOpenUpload={() => {}}
@@ -77,5 +81,7 @@ describe("SidebarPanel", () => {
     expect(screen.getByText(/Model: gemini-2\.5-flash-lite/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clear all" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete Architecture Notes.pdf" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear chats" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete chat AI Portfolio Review" })).toBeInTheDocument();
   });
 });

@@ -23,6 +23,8 @@ vi.mock("./components/workspace/ViewerPanel", () => ({
 
 import App from "./App";
 
+const WORKSPACE_STORAGE_KEY = "studyiacopilot.workspace.v2";
+
 function jsonResponse(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
     status: 200,
@@ -60,6 +62,51 @@ function createDocument(overrides: Partial<Record<string, unknown>> = {}) {
     preview: "A concise technical preview for the indexed document.",
     ...overrides,
   };
+}
+
+function persistWorkspace(overrides: Partial<Record<string, unknown>> = {}) {
+  window.localStorage.setItem(
+    WORKSPACE_STORAGE_KEY,
+    JSON.stringify({
+      documents: [
+        {
+          id: "doc-1",
+          name: "Research Plan.pdf",
+          uploadedAt: Date.parse("2026-04-09T12:00:00.000Z"),
+          chunkCount: 8,
+          pageCount: 3,
+          ragMode: "full",
+          vectorReady: true,
+          preview: "A concise technical preview for the indexed document.",
+        },
+      ],
+      chats: [
+        {
+          id: "chat-seeded",
+          title: "Strategy Review",
+          activeDocId: "doc-1",
+          messages: [
+            {
+              id: "msg-1",
+              role: "assistant",
+              content: "Upload a PDF to begin.",
+            },
+            {
+              id: "msg-2",
+              role: "user",
+              content: "Summarize the strategy.",
+            },
+          ],
+          createdAt: Date.parse("2026-04-09T12:00:00.000Z"),
+          updatedAt: Date.parse("2026-04-09T12:10:00.000Z"),
+        },
+      ],
+      activeChatId: "chat-seeded",
+      activeNav: "workspace",
+      viewerDocId: "doc-1",
+      ...overrides,
+    }),
+  );
 }
 
 describe("App", () => {
@@ -235,6 +282,44 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText("Upload your first PDF to build the workspace.")).toBeInTheDocument();
       expect(screen.getByTestId("viewer-panel")).toHaveTextContent("viewer:none");
+    });
+  });
+
+  it("deletes the active chat and recreates a clean workspace session", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    persistWorkspace();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.endsWith("/api/documents")) {
+          return jsonResponse({
+            documents: [createDocument()],
+          });
+        }
+
+        if (url.endsWith("/api/system/status")) {
+          return jsonResponse(createSystemStatus());
+        }
+
+        throw new Error(`Unhandled request: ${url}`);
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Strategy Review" })).toBeInTheDocument();
+    expect(screen.getByTestId("viewer-panel")).toHaveTextContent("viewer:doc-1");
+
+    await user.click(screen.getByRole("button", { name: "Delete chat Strategy Review" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Welcome back. Upload a PDF, pick a document, and ask anything about it.")).toBeInTheDocument();
+      expect(screen.getByTestId("viewer-panel")).toHaveTextContent("viewer:none");
+      expect(screen.getByRole("heading", { name: "New conversation" })).toBeInTheDocument();
     });
   });
 });
