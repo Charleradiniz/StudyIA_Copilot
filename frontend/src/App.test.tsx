@@ -36,7 +36,8 @@ vi.mock("./components/workspace/ViewerPanel", () => ({
 
 import App from "./App";
 
-const WORKSPACE_STORAGE_KEY = "studyiacopilot.workspace.v2";
+const AUTH_STORAGE_KEY = "studyiacopilot.auth.v1";
+const WORKSPACE_STORAGE_KEY = "studyiacopilot.workspace.v3.user-1";
 
 function jsonResponse(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
@@ -63,6 +64,32 @@ function createSystemStatus(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
+function createUser(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: "user-1",
+    email: "charles@example.com",
+    full_name: "Charles Study",
+    created_at: "2026-04-09T11:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function persistAuth() {
+  window.localStorage.setItem(
+    AUTH_STORAGE_KEY,
+    JSON.stringify({
+      token: "token-123",
+      expiresAt: Date.parse("2026-05-09T12:00:00.000Z"),
+      user: {
+        id: "user-1",
+        email: "charles@example.com",
+        fullName: "Charles Study",
+        createdAt: Date.parse("2026-04-09T11:00:00.000Z"),
+      },
+    }),
+  );
+}
+
 function createDocument(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     doc_id: "doc-1",
@@ -81,18 +108,6 @@ function persistWorkspace(overrides: Partial<Record<string, unknown>> = {}) {
   window.localStorage.setItem(
     WORKSPACE_STORAGE_KEY,
     JSON.stringify({
-      documents: [
-        {
-          id: "doc-1",
-          name: "Research Plan.pdf",
-          uploadedAt: Date.parse("2026-04-09T12:00:00.000Z"),
-          chunkCount: 8,
-          pageCount: 3,
-          ragMode: "full",
-          vectorReady: true,
-          preview: "A concise technical preview for the indexed document.",
-        },
-      ],
       chats: [
         {
           id: "chat-seeded",
@@ -124,10 +139,18 @@ function persistWorkspace(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe("App", () => {
   it("hydrates runtime status and remote documents on load", async () => {
+    persistAuth();
+
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
+
+        if (url.endsWith("/api/auth/me")) {
+          return jsonResponse({
+            user: createUser(),
+          });
+        }
 
         if (url.endsWith("/api/documents")) {
           return jsonResponse({
@@ -153,10 +176,18 @@ describe("App", () => {
   });
 
   it("switches sidebar content across workspace, documents, and activity", async () => {
+    persistAuth();
+
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
+
+        if (url.endsWith("/api/auth/me")) {
+          return jsonResponse({
+            user: createUser(),
+          });
+        }
 
         if (url.endsWith("/api/documents")) {
           return jsonResponse({
@@ -195,9 +226,17 @@ describe("App", () => {
   });
 
   it("asks across multiple active PDFs and switches the viewer to the sourced file", async () => {
+    persistAuth();
+
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
+
+      if (url.endsWith("/api/auth/me") && method === "GET") {
+        return jsonResponse({
+          user: createUser(),
+        });
+      }
 
       if (url.endsWith("/api/documents") && method === "GET") {
         return jsonResponse({
@@ -286,6 +325,8 @@ describe("App", () => {
   });
 
   it("uploads a document and answers a grounded question", async () => {
+    persistAuth();
+
     const uploadedDocument = createDocument({
       doc_id: "doc-uploaded",
       name: "Study Guide.pdf",
@@ -298,6 +339,12 @@ describe("App", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
+
+      if (url.endsWith("/api/auth/me") && method === "GET") {
+        return jsonResponse({
+          user: createUser(),
+        });
+      }
 
       if (url.endsWith("/api/documents") && method === "GET") {
         return jsonResponse({ documents: [] });
@@ -348,6 +395,7 @@ describe("App", () => {
 
     const user = userEvent.setup();
     const { container } = render(<App />);
+    await screen.findByText("Research workspace");
 
     const fileInput = container.querySelector('input[type="file"]');
     expect(fileInput).not.toBeNull();
@@ -380,11 +428,18 @@ describe("App", () => {
   });
 
   it("deletes a document from the library and clears the active viewer", async () => {
+    persistAuth();
     vi.stubGlobal("confirm", vi.fn(() => true));
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
+
+      if (url.endsWith("/api/auth/me") && method === "GET") {
+        return jsonResponse({
+          user: createUser(),
+        });
+      }
 
       if (url.endsWith("/api/documents") && method === "GET") {
         return jsonResponse({
@@ -432,12 +487,19 @@ describe("App", () => {
 
   it("deletes the active chat and recreates a clean workspace session", async () => {
     vi.stubGlobal("confirm", vi.fn(() => true));
+    persistAuth();
     persistWorkspace();
 
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
+
+        if (url.endsWith("/api/auth/me")) {
+          return jsonResponse({
+            user: createUser(),
+          });
+        }
 
         if (url.endsWith("/api/documents")) {
           return jsonResponse({
@@ -466,5 +528,52 @@ describe("App", () => {
       expect(screen.getByTestId("viewer-panel")).toHaveTextContent("viewer:none");
       expect(screen.getByRole("heading", { name: "New conversation" })).toBeInTheDocument();
     });
+  });
+
+  it("shows the authentication screen and signs in", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url.endsWith("/api/auth/login") && method === "POST") {
+        return jsonResponse({
+          token: "token-123",
+          expires_at: "2026-05-09T12:00:00.000Z",
+          user: createUser(),
+        });
+      }
+
+      if (url.endsWith("/api/auth/me") && method === "GET") {
+        return jsonResponse({
+          user: createUser(),
+        });
+      }
+
+      if (url.endsWith("/api/documents") && method === "GET") {
+        return jsonResponse({
+          documents: [createDocument()],
+        });
+      }
+
+      if (url.endsWith("/api/system/status") && method === "GET") {
+        return jsonResponse(createSystemStatus());
+      }
+
+      throw new Error(`Unhandled request: ${method} ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(screen.getByText("Private AI research workspaces for every user.")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Email"), "charles@example.com");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.click(screen.getAllByRole("button", { name: "Sign in" })[1]);
+
+    expect(await screen.findByText("Research Plan.pdf")).toBeInTheDocument();
+    expect(screen.getByText(/Charles Study/i)).toBeInTheDocument();
   });
 });

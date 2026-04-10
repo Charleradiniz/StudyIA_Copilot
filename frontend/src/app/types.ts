@@ -9,6 +9,19 @@ export type Source = {
   line_boxes?: number[][];
 };
 
+export type AppUser = {
+  id: string;
+  email: string;
+  fullName: string;
+  createdAt: number;
+};
+
+export type AuthSession = {
+  token: string;
+  expiresAt: number;
+  user: AppUser;
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -53,3 +66,5 @@ export type SystemStatus = {
   documentsIndexed: number;
   workspaceDataAvailable: boolean;
 };
+
+export type WorkspaceNav = "workspace" | "documents" | "activity";

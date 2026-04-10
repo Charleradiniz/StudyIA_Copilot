@@ -1,19 +1,24 @@
-from pathlib import Path
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
-from app.config import UPLOAD_DIR
+from app.db.deps import get_current_user
+from app.models.user import User
+from app.services.storage import load_document, resolve_upload_path
 
 router = APIRouter()
 
 
 @router.get("/pdf/{file_id}")
-def get_pdf(file_id: str):
+def get_pdf(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+):
     normalized_file_id = file_id.replace(".pdf", "").strip()
-    file_path = Path(UPLOAD_DIR) / f"{normalized_file_id}.pdf"
+    loaded = load_document(normalized_file_id, current_user.id, load_index=False)
+    metadata = loaded.get("metadata", {}) if loaded else {}
+    file_path = resolve_upload_path(normalized_file_id, current_user.id, metadata)
 
-    if not file_path.is_file():
+    if file_path is None or not file_path.is_file():
         raise HTTPException(
             status_code=404,
             detail=f"PDF not found: {normalized_file_id}",

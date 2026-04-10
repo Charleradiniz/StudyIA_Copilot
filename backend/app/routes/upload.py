@@ -1,15 +1,18 @@
 import os
 import shutil
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from app.config import RAG_MODE, UPLOAD_DIR
+from app.config import RAG_MODE
+from app.db.deps import get_current_user
+from app.models.user import User
 from app.services.pdf_reader import extract_chunks_with_positions
 from app.services.embeddings import generate_embeddings
-from app.services.query import DOCUMENTS
-from app.services.storage import save_document
+from app.services.query import DOCUMENTS, get_document_cache_key
+from app.services.storage import get_user_upload_path, save_document
 
 try:
     import faiss
@@ -19,8 +22,6 @@ except Exception:
     np = None
 
 router = APIRouter()
-
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def create_faiss_index(embeddings):
@@ -42,6 +43,7 @@ def create_faiss_index(embeddings):
 
 def build_document_metadata(
     doc_id: str,
+    user_id: str,
     original_name: str,
     file_path: str,
     documents: list[dict],
@@ -56,6 +58,7 @@ def build_document_metadata(
 
     return {
         "doc_id": doc_id,
+        "user_id": user_id,
         "filename": original_name,
         "path": file_path,
         "chunk_count": len(documents),
@@ -81,7 +84,10 @@ def build_upload_response(metadata: dict):
 
 
 @router.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
     file_path = None
     try:
         # =========================
@@ -96,7 +102,8 @@ async def upload_pdf(file: UploadFile = File(...)):
         doc_id = str(uuid4())
         original_name = file.filename
 
-        file_path = os.path.join(UPLOAD_DIR, f"{doc_id}.pdf")
+        upload_path = get_user_upload_path(current_user.id)
+        file_path = str(upload_path / f"{doc_id}.pdf")
 
         # =========================
         # SAVE FILE
@@ -145,13 +152,14 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         metadata = build_document_metadata(
             doc_id,
+            current_user.id,
             original_name,
             file_path,
             documents,
             vector_ready=vector_ready,
         )
 
-        DOCUMENTS[doc_id] = {
+        DOCUMENTS[get_document_cache_key(current_user.id, doc_id)] = {
             "doc_id": doc_id,
             "documents": documents,
             "index": index,
@@ -165,6 +173,7 @@ async def upload_pdf(file: UploadFile = File(...)):
             documents,
             index,
             metadata=metadata,
+            user_id=current_user.id,
         )
 
         return build_upload_response(metadata)

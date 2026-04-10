@@ -3,11 +3,11 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from app.config import CORS_ORIGINS, UPLOAD_DIR
 from app.db.database import Base, engine
-from app.models import document
+from app.models import auth_session, document, user
+from app.routes.auth import router as auth_router
 from app.routes.pdf import router as pdf_router
 from app.routes.system import router as system_router
 from app.routes.upload import router as upload_router
@@ -39,9 +39,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-
-
 @app.get("/")
 def root():
     return {
@@ -51,6 +48,7 @@ def root():
     }
 
 
+app.include_router(auth_router, prefix="/api")
 app.include_router(upload_router, prefix="/api")
 app.include_router(query_router, prefix="/api")
 app.include_router(pdf_router, prefix="/api")

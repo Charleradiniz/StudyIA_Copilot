@@ -7,6 +7,37 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
   const pdfBytes = Buffer.from(TEST_PDF_BASE64, "base64");
   let uploadCount = 0;
 
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "studyiacopilot.auth.v1",
+      JSON.stringify({
+        token: "token-123",
+        expiresAt: Date.parse("2026-05-09T12:00:00.000Z"),
+        user: {
+          id: "user-1",
+          email: "charles@example.com",
+          fullName: "Charles Study",
+          createdAt: Date.parse("2026-04-09T11:00:00.000Z"),
+        },
+      }),
+    );
+  });
+
+  await page.route("http://127.0.0.1:8000/api/auth/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: {
+          id: "user-1",
+          email: "charles@example.com",
+          full_name: "Charles Study",
+          created_at: "2026-04-09T11:00:00.000Z",
+        },
+      }),
+    });
+  });
+
   await page.route("http://127.0.0.1:8000/api/system/status", async (route) => {
     await route.fulfill({
       status: 200,
@@ -79,7 +110,7 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
     });
   });
 
-  await page.route(/http:\/\/127\.0\.0\.1:8000\/api\/pdf\/doc-e2e-(1|2)/, async (route) => {
+  await page.route(/http:\/\/127\.0\.0\.1:8000\/api\/pdf\/doc-e2e-(1|2)(\?token=.*)?/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/pdf",
@@ -108,6 +139,7 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
   page.on("dialog", (dialog) => dialog.accept());
 
   await expect(page.getByText("Research workspace")).toBeVisible();
+  await expect(page.getByText("Charles Study")).toBeVisible();
   await expect(page.getByText("Document library")).toBeVisible();
   await expect(page.getByText("Chat history")).toBeVisible();
 

@@ -2,20 +2,21 @@ from collections import defaultdict, deque
 from pathlib import Path
 from time import perf_counter
 import logging
-import os
 import re
 import traceback
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from pydantic import BaseModel
 
-from app.config import DATA_DIR, RAG_MODE
+from app.config import RAG_MODE
+from app.db.deps import get_current_user
+from app.models.user import User
 from app.services.embeddings import model
 from app.services.llm import generate_answer
 from app.services.reranker import rerank
 from app.services.similarity import search
-from app.services.storage import load_document
+from app.services.storage import iter_saved_documents, load_document
 
 router = APIRouter()
 logger = logging.getLogger("studyiacopilot.query")
@@ -167,6 +168,10 @@ def normalize_loaded(doc_id: str, loaded: dict):
     }
 
 
+def get_document_cache_key(user_id: str, doc_id: str) -> str:
+    return f"{user_id}:{doc_id}"
+
+
 def normalize_requested_doc_ids(data: AskRequest) -> list[str]:
     requested_doc_ids: list[str] = []
 
@@ -296,16 +301,17 @@ def format_sources(chunks):
 # =========================
 # LOAD DOCUMENT SAFE
 # =========================
-def get_document(doc_id: str):
-    if doc_id in DOCUMENTS:
-        cached_doc = DOCUMENTS[doc_id]
+def get_document(user_id: str, doc_id: str):
+    cache_key = get_document_cache_key(user_id, doc_id)
+    if cache_key in DOCUMENTS:
+        cached_doc = DOCUMENTS[cache_key]
         if not cached_doc.get("doc_id"):
             cached_doc["doc_id"] = doc_id
         if not cached_doc.get("name"):
             cached_doc["name"] = get_document_name(cached_doc)
         return cached_doc
 
-    loaded = load_document(doc_id)
+    loaded = load_document(doc_id, user_id)
 
     if not loaded:
         return None
@@ -315,16 +321,16 @@ def get_document(doc_id: str):
     if not doc.get("documents"):
         return None
 
-    DOCUMENTS[doc_id] = doc
+    DOCUMENTS[cache_key] = doc
     return doc
 
 
-def resolve_documents(requested_doc_ids: list[str]):
+def resolve_documents(user_id: str, requested_doc_ids: list[str]):
     if requested_doc_ids:
         docs = []
 
         for requested_doc_id in requested_doc_ids:
-            doc = get_document(requested_doc_id)
+            doc = get_document(user_id, requested_doc_id)
             if not doc:
                 raise HTTPException(
                     status_code=404,
@@ -336,15 +342,9 @@ def resolve_documents(requested_doc_ids: list[str]):
 
     docs = []
 
-    if not os.path.exists(DATA_DIR):
-        raise HTTPException(status_code=500, detail="DATA_DIR nao encontrado")
-
-    for file in sorted(os.listdir(DATA_DIR)):
-        if not file.endswith(".json"):
-            continue
-
-        current_id = file.replace(".json", "")
-        doc = get_document(current_id)
+    for record in iter_saved_documents(user_id):
+        current_id = record["doc_id"]
+        doc = get_document(user_id, current_id)
         if doc:
             docs.append(doc)
 
@@ -616,7 +616,10 @@ def apply_document_diversity(chunks: list[dict], top_k: int) -> list[dict]:
 # MAIN ENDPOINT
 # =========================
 @router.post("/ask")
-async def ask_question(data: AskRequest):
+async def ask_question(
+    data: AskRequest,
+    current_user: User = Depends(get_current_user),
+):
     request_started_at = perf_counter()
     requested_doc_ids = normalize_requested_doc_ids(data)
 
@@ -626,7 +629,7 @@ async def ask_question(data: AskRequest):
         if not question:
             raise HTTPException(status_code=400, detail="question e obrigatorio")
 
-        docs = resolve_documents(requested_doc_ids)
+        docs = resolve_documents(current_user.id, requested_doc_ids)
         prompt_mode = detect_prompt_mode(question, len(docs))
         effective_question = build_effective_query(question, data.history)
 
@@ -739,12 +742,16 @@ async def ask_question(data: AskRequest):
 # =========================
 # COMPAT LAYER
 # =========================
-def search_similar_documents(question: str, doc_id: str = None):
+def search_similar_documents(
+    question: str,
+    doc_id: str = None,
+    user_id: str | None = None,
+):
     try:
-        if not doc_id:
+        if not doc_id or not user_id:
             return []
 
-        doc = get_document(doc_id)
+        doc = get_document(user_id, doc_id)
         if not doc:
             return []
 

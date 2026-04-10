@@ -1,8 +1,37 @@
 export const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
+let authToken: string | null = null;
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 export type ConversationTurn = {
   role: "user" | "assistant";
   content: string;
+};
+
+export type ApiUserResponse = {
+  id: string;
+  email: string;
+  full_name: string;
+  created_at: string;
+};
+
+export type AuthResponse = {
+  token: string;
+  expires_at: string;
+  user: ApiUserResponse;
+};
+
+export type AuthMeResponse = {
+  user: ApiUserResponse;
 };
 
 export type UploadPdfResponse = {
@@ -69,8 +98,12 @@ export type AskQuestionResponse = {
   }[];
 };
 
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
+
 async function parseResponse<T>(res: Response): Promise<T> {
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
     const message =
@@ -78,17 +111,81 @@ async function parseResponse<T>(res: Response): Promise<T> {
       (typeof data?.error === "string" && data.error) ||
       "Unexpected API error.";
 
-    throw new Error(message);
+    throw new ApiError(message, res.status);
   }
 
   return data as T;
+}
+
+function createHeaders(headers?: HeadersInit) {
+  const nextHeaders = new Headers(headers);
+
+  if (authToken) {
+    nextHeaders.set("Authorization", `Bearer ${authToken}`);
+  }
+
+  return nextHeaders;
+}
+
+async function apiFetch(path: string, init?: RequestInit) {
+  const headers = createHeaders(init?.headers);
+
+  return fetch(`${API_URL}${path}`, {
+    ...init,
+    headers,
+  });
+}
+
+export async function registerUser(payload: {
+  fullName: string;
+  email: string;
+  password: string;
+}) {
+  const res = await apiFetch("/api/auth/register", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      full_name: payload.fullName,
+      email: payload.email,
+      password: payload.password,
+    }),
+  });
+
+  return parseResponse<AuthResponse>(res);
+}
+
+export async function loginUser(payload: { email: string; password: string }) {
+  const res = await apiFetch("/api/auth/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<AuthResponse>(res);
+}
+
+export async function getCurrentUser() {
+  const res = await apiFetch("/api/auth/me");
+  return parseResponse<AuthMeResponse>(res);
+}
+
+export async function logoutUser() {
+  const res = await apiFetch("/api/auth/logout", {
+    method: "POST",
+  });
+
+  return parseResponse<{ logged_out: boolean }>(res);
 }
 
 export async function uploadPdf(file: File) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`${API_URL}/api/upload`, {
+  const res = await apiFetch("/api/upload", {
     method: "POST",
     body: formData,
   });
@@ -102,7 +199,7 @@ export async function askQuestion(
   history: ConversationTurn[] = [],
 ) {
   const normalizedDocIds = [...new Set(docIds.filter(Boolean))];
-  const res = await fetch(`${API_URL}/api/ask`, {
+  const res = await apiFetch("/api/ask", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -119,17 +216,17 @@ export async function askQuestion(
 }
 
 export async function listDocuments() {
-  const res = await fetch(`${API_URL}/api/documents`);
+  const res = await apiFetch("/api/documents");
   return parseResponse<DocumentsResponse>(res);
 }
 
 export async function getSystemStatus() {
-  const res = await fetch(`${API_URL}/api/system/status`);
+  const res = await apiFetch("/api/system/status");
   return parseResponse<SystemStatusResponse>(res);
 }
 
 export async function deleteDocument(docId: string) {
-  const res = await fetch(`${API_URL}/api/documents/${encodeURIComponent(docId)}`, {
+  const res = await apiFetch(`/api/documents/${encodeURIComponent(docId)}`, {
     method: "DELETE",
   });
 
@@ -137,7 +234,7 @@ export async function deleteDocument(docId: string) {
 }
 
 export async function clearDocuments() {
-  const res = await fetch(`${API_URL}/api/documents`, {
+  const res = await apiFetch("/api/documents", {
     method: "DELETE",
   });
 

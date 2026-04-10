@@ -45,11 +45,14 @@ const baseProps = {
   deletingChatId: null,
   deletingDocId: null,
   uploading: false,
+  userEmail: "charles@example.com",
+  userName: "Charles Study",
   onChangeNav: vi.fn(),
   onClearChats: vi.fn(),
   onClearDocuments: vi.fn(),
   onDeleteChat: vi.fn(),
   onDeleteDocument: vi.fn(),
+  onLogout: vi.fn(),
   onNewChat: vi.fn(),
   onOpenUpload: vi.fn(),
   onSelectChat: vi.fn(),
@@ -71,6 +74,8 @@ describe("SidebarPanel", () => {
     expect(screen.getByRole("button", { name: "Delete Architecture Notes.pdf" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clear chats" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete chat AI Portfolio Review" })).toBeInTheDocument();
+    expect(screen.getByText(/Charles Study/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Log out" })).toBeInTheDocument();
   });
 
   it("shows only documents on the documents tab", () => {

@@ -9,10 +9,22 @@ except Exception:
     faiss = None
 
 
-DATA_PATH = Path(DATA_DIR)
-DATA_PATH.mkdir(parents=True, exist_ok=True)
-UPLOAD_PATH = Path(UPLOAD_DIR)
-UPLOAD_PATH.mkdir(parents=True, exist_ok=True)
+DATA_ROOT = Path(DATA_DIR)
+DATA_ROOT.mkdir(parents=True, exist_ok=True)
+UPLOAD_ROOT = Path(UPLOAD_DIR)
+UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+def get_user_data_path(user_id: str) -> Path:
+    path = DATA_ROOT / user_id
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def get_user_upload_path(user_id: str) -> Path:
+    path = UPLOAD_ROOT / user_id
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def iter_doc_id_candidates(doc_id: str):
@@ -38,33 +50,35 @@ def iter_doc_id_candidates(doc_id: str):
     return candidates
 
 
-def get_paths(doc_id: str):
-    faiss_path = DATA_PATH / f"{doc_id}.faiss"
-    json_path = DATA_PATH / f"{doc_id}.json"
+def get_paths(doc_id: str, user_id: str):
+    data_path = get_user_data_path(user_id)
+    faiss_path = data_path / f"{doc_id}.faiss"
+    json_path = data_path / f"{doc_id}.json"
     return faiss_path, json_path
 
 
-def find_saved_doc_id(doc_id: str):
+def find_saved_doc_id(doc_id: str, user_id: str):
     for candidate in iter_doc_id_candidates(doc_id):
-        _, json_path = get_paths(candidate)
+        _, json_path = get_paths(candidate, user_id)
         if json_path.exists():
             return candidate
 
     return None
 
 
-def iter_upload_paths(doc_id: str, metadata=None):
+def iter_upload_paths(doc_id: str, user_id: str, metadata=None):
     paths = []
 
     file_path = (metadata or {}).get("path")
     if file_path:
         paths.append(Path(file_path))
 
+    upload_path = get_user_upload_path(user_id)
     for candidate in iter_doc_id_candidates(doc_id):
         if candidate.lower().endswith(".pdf"):
-            candidate_path = UPLOAD_PATH / candidate
+            candidate_path = upload_path / candidate
         else:
-            candidate_path = UPLOAD_PATH / f"{candidate}.pdf"
+            candidate_path = upload_path / f"{candidate}.pdf"
 
         if candidate_path not in paths:
             paths.append(candidate_path)
@@ -72,8 +86,16 @@ def iter_upload_paths(doc_id: str, metadata=None):
     return paths
 
 
-def save_document(doc_id: str, documents, index, metadata=None):
-    faiss_path, json_path = get_paths(doc_id)
+def resolve_upload_path(doc_id: str, user_id: str, metadata=None):
+    for upload_path in iter_upload_paths(doc_id, user_id, metadata):
+        if upload_path.exists() and upload_path.is_file():
+            return upload_path
+
+    return None
+
+
+def save_document(doc_id: str, documents, index, metadata=None, user_id: str = ""):
+    faiss_path, json_path = get_paths(doc_id, user_id)
 
     if index is not None and faiss is not None:
         faiss.write_index(index, str(faiss_path))
@@ -92,8 +114,8 @@ def save_document(doc_id: str, documents, index, metadata=None):
     }
 
 
-def load_document(doc_id: str, *, load_index: bool = True):
-    faiss_path, json_path = get_paths(doc_id)
+def load_document(doc_id: str, user_id: str, *, load_index: bool = True):
+    faiss_path, json_path = get_paths(doc_id, user_id)
 
     if not json_path.exists():
         return None
@@ -118,12 +140,12 @@ def load_document(doc_id: str, *, load_index: bool = True):
     }
 
 
-def delete_saved_document(doc_id: str):
-    saved_doc_id = find_saved_doc_id(doc_id)
+def delete_saved_document(doc_id: str, user_id: str):
+    saved_doc_id = find_saved_doc_id(doc_id, user_id)
     if not saved_doc_id:
         return None
 
-    loaded = load_document(saved_doc_id, load_index=False) or {}
+    loaded = load_document(saved_doc_id, user_id, load_index=False) or {}
     metadata = loaded.get("metadata", {})
     removed_files = []
     candidate_ids = []
@@ -133,13 +155,13 @@ def delete_saved_document(doc_id: str):
             candidate_ids.append(candidate)
 
     for candidate in candidate_ids:
-        faiss_path, json_path = get_paths(candidate)
+        faiss_path, json_path = get_paths(candidate, user_id)
         for target_path in (faiss_path, json_path):
             if target_path.exists():
                 target_path.unlink()
                 removed_files.append(str(target_path))
 
-    for upload_path in iter_upload_paths(saved_doc_id, metadata):
+    for upload_path in iter_upload_paths(saved_doc_id, user_id, metadata):
         if upload_path.exists() and upload_path.is_file():
             upload_path.unlink()
             removed_files.append(str(upload_path))
@@ -151,25 +173,25 @@ def delete_saved_document(doc_id: str):
     }
 
 
-def clear_saved_documents():
+def clear_saved_documents(user_id: str):
     removed_documents = []
 
-    for record in list(iter_saved_documents()):
-        deleted = delete_saved_document(record["doc_id"])
+    for record in list(iter_saved_documents(user_id)):
+        deleted = delete_saved_document(record["doc_id"], user_id)
         if deleted:
             removed_documents.append(deleted)
 
     return removed_documents
 
 
-def iter_saved_documents():
-    for json_path in sorted(DATA_PATH.glob("*.json"), reverse=True):
+def iter_saved_documents(user_id: str):
+    for json_path in sorted(get_user_data_path(user_id).glob("*.json"), reverse=True):
         doc_id = json_path.stem
-        loaded = load_document(doc_id, load_index=False)
+        loaded = load_document(doc_id, user_id, load_index=False)
         if not loaded:
             continue
 
-        faiss_path, _ = get_paths(doc_id)
+        faiss_path, _ = get_paths(doc_id, user_id)
 
         yield {
             "doc_id": doc_id,

@@ -2,36 +2,47 @@ import { startTransition, useEffect, useMemo, useRef, useState, type ChangeEvent
 import { createAssistantMessage, createChat, createId } from "./app/chat-utils";
 import type {
   AppDocument,
+  AppUser,
+  AuthSession,
   ChatMessage,
   ChatSession,
   ConversationTurn,
   Source,
   SystemStatus,
+  WorkspaceNav,
 } from "./app/types";
+import AuthScreen from "./components/auth/AuthScreen";
 import PdfModal from "./components/PdfModal";
 import ChatWorkspace from "./components/workspace/ChatWorkspace";
 import SidebarPanel from "./components/workspace/SidebarPanel";
 import ViewerPanel from "./components/workspace/ViewerPanel";
 import {
   API_URL,
+  ApiError,
   askQuestion,
   clearDocuments,
   deleteDocument,
+  getCurrentUser,
   getSystemStatus,
+  loginUser,
   listDocuments,
+  logoutUser,
+  registerUser,
+  setAuthToken,
   uploadPdf,
+  type ApiUserResponse,
+  type AuthResponse,
   type DocumentSummaryResponse,
   type SystemStatusResponse,
 } from "./services/api";
 
-const WORKSPACE_STORAGE_KEY = "studyiacopilot.workspace.v2";
-const LEGACY_WORKSPACE_STORAGE_KEY = "studyiacopilot.workspace.v1";
+const AUTH_STORAGE_KEY = "studyiacopilot.auth.v1";
+const WORKSPACE_STORAGE_PREFIX = "studyiacopilot.workspace.v3";
 
 type PersistedWorkspace = {
-  documents: AppDocument[];
   chats: ChatSession[];
   activeChatId: string;
-  activeNav: "workspace" | "documents" | "activity";
+  activeNav: WorkspaceNav;
   viewerDocId: string | null;
 };
 
@@ -48,35 +59,6 @@ function toTimestamp(value: unknown) {
   }
 
   return Date.now();
-}
-
-function normalizeDocument(
-  value: Partial<AppDocument> & { id?: unknown; name?: unknown },
-): AppDocument | null {
-  if (typeof value.id !== "string" || typeof value.name !== "string") {
-    return null;
-  }
-
-  return {
-    id: value.id,
-    name: value.name,
-    uploadedAt: toTimestamp(value.uploadedAt),
-    chunkCount:
-      typeof value.chunkCount === "number"
-        ? value.chunkCount
-        : typeof value.chunkCount === "string"
-          ? Number(value.chunkCount) || 0
-          : 0,
-    pageCount:
-      typeof value.pageCount === "number"
-        ? value.pageCount
-        : typeof value.pageCount === "string"
-          ? Number(value.pageCount) || 0
-          : 0,
-    ragMode: typeof value.ragMode === "string" ? value.ragMode : "lite",
-    vectorReady: Boolean(value.vectorReady),
-    preview: typeof value.preview === "string" ? value.preview : "",
-  };
 }
 
 function normalizeActiveDocIds(value: unknown, legacyValue?: unknown) {
@@ -164,6 +146,23 @@ function normalizeChat(value: unknown): ChatSession | null {
   };
 }
 
+function mapApiUser(user: ApiUserResponse): AppUser {
+  return {
+    id: user.id,
+    email: user.email,
+    fullName: user.full_name,
+    createdAt: toTimestamp(user.created_at),
+  };
+}
+
+function mapAuthSession(response: AuthResponse): AuthSession {
+  return {
+    token: response.token,
+    expiresAt: toTimestamp(response.expires_at),
+    user: mapApiUser(response.user),
+  };
+}
+
 function mapApiDocument(document: DocumentSummaryResponse): AppDocument {
   return {
     id: document.doc_id,
@@ -204,15 +203,67 @@ function mergeDocuments(...collections: AppDocument[][]) {
   return [...merged.values()].sort((left, right) => right.uploadedAt - left.uploadedAt);
 }
 
-function loadPersistedWorkspace(): PersistedWorkspace | null {
+function loadPersistedAuth(): AuthSession | null {
   if (typeof window === "undefined") {
     return null;
   }
 
   try {
-    const raw =
-      window.localStorage.getItem(WORKSPACE_STORAGE_KEY) ??
-      window.localStorage.getItem(LEGACY_WORKSPACE_STORAGE_KEY);
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<{
+      token: unknown;
+      expiresAt: unknown;
+      user: Partial<AppUser>;
+    }>;
+    if (!parsed || typeof parsed.token !== "string" || !parsed.user) {
+      return null;
+    }
+
+    const user = parsed.user as Partial<AppUser>;
+    if (
+      typeof user.id !== "string" ||
+      typeof user.email !== "string" ||
+      typeof user.fullName !== "string"
+    ) {
+      return null;
+    }
+
+    const expiresAt = toTimestamp(parsed.expiresAt);
+    if (expiresAt <= Date.now()) {
+      return null;
+    }
+
+    return {
+      token: parsed.token,
+      expiresAt,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        createdAt: toTimestamp(user.createdAt),
+      },
+    };
+  } catch (error) {
+    console.error("Failed to load persisted auth session", error);
+    return null;
+  }
+}
+
+function getWorkspaceStorageKey(userId: string) {
+  return `${WORKSPACE_STORAGE_PREFIX}.${userId}`;
+}
+
+function loadPersistedWorkspace(userId: string): PersistedWorkspace | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(getWorkspaceStorageKey(userId));
     if (!raw) {
       return null;
     }
@@ -220,13 +271,10 @@ function loadPersistedWorkspace(): PersistedWorkspace | null {
     const parsed = JSON.parse(raw) as Partial<PersistedWorkspace> & {
       chats?: unknown[];
     };
-    if (!Array.isArray(parsed.documents) || !Array.isArray(parsed.chats) || parsed.chats.length === 0) {
+    if (!Array.isArray(parsed.chats) || parsed.chats.length === 0) {
       return null;
     }
 
-    const documents = parsed.documents
-      .map((document) => normalizeDocument(document as Partial<AppDocument>))
-      .filter((document): document is AppDocument => Boolean(document));
     const chats = parsed.chats
       .map((chat) => normalizeChat(chat))
       .filter((chat): chat is ChatSession => Boolean(chat));
@@ -241,7 +289,6 @@ function loadPersistedWorkspace(): PersistedWorkspace | null {
         : "workspace";
 
     return {
-      documents,
       chats,
       activeChatId:
         typeof parsed.activeChatId === "string" && parsed.activeChatId
@@ -257,25 +304,21 @@ function loadPersistedWorkspace(): PersistedWorkspace | null {
 }
 
 export default function App() {
-  const persistedWorkspace = loadPersistedWorkspace();
-  const initialChatRef = useRef<ChatSession>(persistedWorkspace?.chats[0] ?? createChat());
+  const persistedAuth = loadPersistedAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-  const [documents, setDocuments] = useState<AppDocument[]>(persistedWorkspace?.documents ?? []);
-  const [chats, setChats] = useState<ChatSession[]>(
-    persistedWorkspace?.chats ?? [initialChatRef.current],
-  );
-  const [activeChatId, setActiveChatId] = useState(
-    persistedWorkspace?.activeChatId ?? initialChatRef.current.id,
-  );
+  const [auth, setAuth] = useState<AuthSession | null>(persistedAuth);
+  const [authLoading, setAuthLoading] = useState(Boolean(persistedAuth));
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [documents, setDocuments] = useState<AppDocument[]>([]);
+  const [chats, setChats] = useState<ChatSession[]>([]);
+  const [activeChatId, setActiveChatId] = useState("");
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [activeNav, setActiveNav] = useState<"workspace" | "documents" | "activity">(
-    persistedWorkspace?.activeNav ?? "workspace",
-  );
-  const [viewerDocId, setViewerDocId] = useState<string | null>(persistedWorkspace?.viewerDocId ?? null);
+  const [activeNav, setActiveNav] = useState<WorkspaceNav>("workspace");
+  const [viewerDocId, setViewerDocId] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<Source | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [pdfFocusToken, setPdfFocusToken] = useState(0);
@@ -288,8 +331,9 @@ export default function App() {
     typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
   );
 
+  const isAuthenticated = Boolean(auth?.token);
   const activeChat = useMemo(
-    () => chats.find((chat) => chat.id === activeChatId) ?? chats[0],
+    () => chats.find((chat) => chat.id === activeChatId) ?? chats[0] ?? null,
     [activeChatId, chats],
   );
 
@@ -305,6 +349,31 @@ export default function App() {
     () => documents.find((doc) => doc.id === viewerDocId) ?? null,
     [documents, viewerDocId],
   );
+
+  const performLocalSignOut = () => {
+    setAuth(null);
+    setDocuments([]);
+    setChats([]);
+    setActiveChatId("");
+    setActiveNav("workspace");
+    setViewerDocId(null);
+    setSelectedSource(null);
+    setPdfOpen(false);
+    setSystemStatus(null);
+    setInput("");
+    setLoading(false);
+    setUploading(false);
+    setAuthLoading(false);
+  };
+
+  const handleUnauthorized = (error: unknown) => {
+    if (error instanceof ApiError && error.status === 401) {
+      performLocalSignOut();
+      return true;
+    }
+
+    return false;
+  };
 
   useEffect(() => {
     if (!activeChat) return;
@@ -326,6 +395,132 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    setAuthToken(auth?.token ?? null);
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (!auth) {
+      window.localStorage.removeItem(AUTH_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+  }, [auth]);
+
+  useEffect(() => {
+    if (!auth?.token) {
+      setAuthLoading(false);
+      return;
+    }
+
+    let ignore = false;
+    setAuthLoading(true);
+
+    getCurrentUser()
+      .then((response) => {
+        if (ignore) {
+          return;
+        }
+
+        setAuth((currentAuth) =>
+          currentAuth
+            ? {
+                ...currentAuth,
+                user: mapApiUser(response.user),
+              }
+            : currentAuth,
+        );
+      })
+      .catch((error) => {
+        if (!ignore) {
+          console.error("Failed to validate auth session", error);
+          performLocalSignOut();
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setAuthLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [auth?.token]);
+
+  useEffect(() => {
+    if (!auth?.user.id) {
+      return;
+    }
+
+    const persistedWorkspace = loadPersistedWorkspace(auth.user.id);
+    const nextChats = persistedWorkspace?.chats ?? [createChat()];
+    const nextActiveChatId =
+      persistedWorkspace?.activeChatId && nextChats.some((chat) => chat.id === persistedWorkspace.activeChatId)
+        ? persistedWorkspace.activeChatId
+        : nextChats[0].id;
+
+    setChats(nextChats);
+    setActiveChatId(nextActiveChatId);
+    setActiveNav(persistedWorkspace?.activeNav ?? "workspace");
+    setViewerDocId(persistedWorkspace?.viewerDocId ?? null);
+    setSelectedSource(null);
+    setPdfOpen(false);
+  }, [auth?.user.id]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    let ignore = false;
+
+    Promise.allSettled([listDocuments(), getSystemStatus()]).then((results) => {
+      if (ignore) {
+        return;
+      }
+
+      const [documentsResult, systemResult] = results;
+
+      if (documentsResult.status === "fulfilled") {
+        const remoteDocuments = documentsResult.value.documents.map(mapApiDocument);
+        startTransition(() => {
+          setDocuments(remoteDocuments);
+          setChats((currentChats) =>
+            currentChats.map((chat) => ({
+              ...chat,
+              activeDocIds: chat.activeDocIds.filter((docId) =>
+                remoteDocuments.some((document) => document.id === docId),
+              ),
+            })),
+          );
+        });
+      } else {
+        console.error("Failed to load indexed documents", documentsResult.reason);
+        if (documentsResult.reason instanceof ApiError && documentsResult.reason.status === 401) {
+          performLocalSignOut();
+          return;
+        }
+      }
+
+      if (systemResult.status === "fulfilled") {
+        setSystemStatus(mapSystemStatus(systemResult.value));
+      } else {
+        console.error("Failed to load system status", systemResult.reason);
+        if (systemResult.reason instanceof ApiError && systemResult.reason.status === 401) {
+          performLocalSignOut();
+        }
+      }
+    });
+
+    return () => {
+      ignore = true;
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
     const nextActiveDocIds = activeChat?.activeDocIds ?? [];
 
     if (nextActiveDocIds.length === 0) {
@@ -340,53 +535,34 @@ export default function App() {
   }, [activeChat?.activeDocIds]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || chats.length === 0 || !activeChat) return;
+    if (
+      typeof window === "undefined" ||
+      !auth?.user.id ||
+      chats.length === 0 ||
+      !activeChat
+    ) {
+      return;
+    }
 
     const payload: PersistedWorkspace = {
-      documents,
       chats,
       activeChatId: activeChat.id,
       activeNav,
       viewerDocId,
     };
 
-    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(payload));
-  }, [activeChat, activeNav, chats, documents, viewerDocId]);
+    window.localStorage.setItem(getWorkspaceStorageKey(auth.user.id), JSON.stringify(payload));
+  }, [activeChat, activeNav, auth?.user.id, chats, viewerDocId]);
 
-  useEffect(() => {
-    let ignore = false;
+  const pdfUrl =
+    viewerDocId && auth?.token
+      ? `${API_URL}/api/pdf/${viewerDocId}?token=${encodeURIComponent(auth.token)}`
+      : "";
 
-    Promise.allSettled([listDocuments(), getSystemStatus()]).then((results) => {
-      if (ignore) {
-        return;
-      }
-
-      const [documentsResult, systemResult] = results;
-
-      if (documentsResult.status === "fulfilled") {
-        const remoteDocuments = documentsResult.value.documents.map(mapApiDocument);
-        startTransition(() => {
-          setDocuments((currentDocuments) => mergeDocuments(currentDocuments, remoteDocuments));
-        });
-      } else {
-        console.error("Failed to load indexed documents", documentsResult.reason);
-      }
-
-      if (systemResult.status === "fulfilled") {
-        setSystemStatus(mapSystemStatus(systemResult.value));
-      } else {
-        console.error("Failed to load system status", systemResult.reason);
-      }
-    });
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
-  const pdfUrl = viewerDocId ? `${API_URL}/api/pdf/${viewerDocId}` : "";
-
-  const updateChat = (chatId: string, updater: (chat: ChatSession) => ChatSession) => {
+  const updateChat = (
+    chatId: string,
+    updater: (chat: ChatSession) => ChatSession,
+  ) => {
     setChats((currentChats) =>
       currentChats.map((chat) => (chat.id === chatId ? updater(chat) : chat)),
     );
@@ -620,6 +796,9 @@ export default function App() {
       setSelectedSource(null);
     } catch (error) {
       console.error(error);
+      if (handleUnauthorized(error)) {
+        return;
+      }
 
       updateChat(targetChatId, (chat) => ({
         ...chat,
@@ -716,6 +895,9 @@ export default function App() {
       );
     } catch (error) {
       console.error(error);
+      if (handleUnauthorized(error)) {
+        return;
+      }
 
       updateChat(targetChatId, (chat) => ({
         ...chat,
@@ -751,6 +933,9 @@ export default function App() {
       applyRemovedDocuments([docId]);
     } catch (error) {
       console.error(error);
+      if (handleUnauthorized(error)) {
+        return;
+      }
 
       if (activeChat) {
         updateChat(activeChat.id, (chat) => ({
@@ -795,6 +980,9 @@ export default function App() {
       applyRemovedDocuments(removedDocIds);
     } catch (error) {
       console.error(error);
+      if (handleUnauthorized(error)) {
+        return;
+      }
 
       if (activeChat) {
         updateChat(activeChat.id, (chat) => ({
@@ -858,7 +1046,62 @@ export default function App() {
     }
   };
 
-  if (!activeChat) return null;
+  const handleAuthSubmit = async (payload: {
+    mode: "login" | "register";
+    fullName: string;
+    email: string;
+    password: string;
+  }) => {
+    setAuthSubmitting(true);
+
+    try {
+      const response =
+        payload.mode === "login"
+          ? await loginUser({
+              email: payload.email,
+              password: payload.password,
+            })
+          : await registerUser({
+              fullName: payload.fullName,
+              email: payload.email,
+              password: payload.password,
+            });
+
+      setAuth(mapAuthSession(response));
+      setAuthLoading(true);
+      setInput("");
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      if (auth?.token) {
+        await logoutUser();
+      }
+    } catch (error) {
+      console.error("Failed to logout cleanly", error);
+    } finally {
+      performLocalSignOut();
+    }
+  };
+
+  const currentUser = auth?.user;
+
+  if (!isAuthenticated) {
+    return <AuthScreen loading={authSubmitting} onSubmit={handleAuthSubmit} />;
+  }
+
+  if (authLoading || !activeChat || !currentUser) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-6 text-white">
+        <div className="rounded-[28px] border border-white/10 bg-[var(--panel)] px-6 py-5 text-sm text-[var(--muted-foreground)] shadow-[0_24px_80px_-48px_rgba(15,23,42,0.8)]">
+          Loading your private workspace...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--app-foreground)]">
@@ -884,11 +1127,14 @@ export default function App() {
           deletingDocId={deletingDocId}
           documents={documents}
           uploading={uploading}
+          userName={currentUser.fullName}
+          userEmail={currentUser.email}
           onChangeNav={setActiveNav}
           onClearChats={handleClearChats}
           onClearDocuments={handleClearDocuments}
           onDeleteChat={handleDeleteChat}
           onDeleteDocument={handleDeleteDocument}
+          onLogout={handleLogout}
           onNewChat={startNewChat}
           onOpenUpload={() => fileInputRef.current?.click()}
           onSelectChat={(chatId) => {
