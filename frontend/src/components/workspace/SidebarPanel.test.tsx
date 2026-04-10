@@ -54,8 +54,12 @@ describe("SidebarPanel", () => {
           documentsIndexed: 1,
           workspaceDataAvailable: true,
         }}
+        clearingDocuments={false}
+        deletingDocId={null}
         uploading={false}
         onChangeNav={() => {}}
+        onClearDocuments={() => {}}
+        onDeleteDocument={() => {}}
         onNewChat={() => {}}
         onOpenUpload={() => {}}
         onSelectChat={() => {}}
@@ -71,5 +75,7 @@ describe("SidebarPanel", () => {
     expect(screen.getByText("4 pages")).toBeInTheDocument();
     expect(screen.getByText("vector ready")).toBeInTheDocument();
     expect(screen.getByText(/Model: gemini-2\.5-flash-lite/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear all" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Architecture Notes.pdf" })).toBeInTheDocument();
   });
 });

@@ -186,4 +186,55 @@ describe("App", () => {
       expect(screen.getByTestId("viewer-panel")).toHaveTextContent("page:1");
     });
   });
+
+  it("deletes a document from the library and clears the active viewer", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url.endsWith("/api/documents") && method === "GET") {
+        return jsonResponse({
+          documents: [createDocument()],
+        });
+      }
+
+      if (url.endsWith("/api/system/status") && method === "GET") {
+        return jsonResponse(createSystemStatus());
+      }
+
+      if (url.endsWith("/api/documents/doc-1") && method === "DELETE") {
+        return jsonResponse({
+          doc_id: "doc-1",
+          removed: true,
+          removed_files: [
+            "backend/uploads/doc-1.pdf",
+            "backend/data/doc-1.json",
+          ],
+        });
+      }
+
+      throw new Error(`Unhandled request: ${method} ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    const documentTitle = await screen.findByText("Research Plan.pdf");
+    await user.click(documentTitle.closest("button") as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("viewer-panel")).toHaveTextContent("viewer:doc-1");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Delete Research Plan.pdf" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Upload your first PDF to build the workspace.")).toBeInTheDocument();
+      expect(screen.getByTestId("viewer-panel")).toHaveTextContent("viewer:none");
+    });
+  });
 });

@@ -4,12 +4,22 @@ from fastapi import APIRouter, HTTPException
 
 from app.config import GEMINI_API_KEY, GEMINI_MODEL, RAG_MODE
 from app.services.embeddings import model as embedding_model
-from app.services.query import get_document
+from app.services.query import DOCUMENTS, get_document
 from app.services.reranker import reranker_model
 from app.services.storage import faiss as faiss_module
-from app.services.storage import iter_saved_documents
+from app.services.storage import (
+    clear_saved_documents,
+    delete_saved_document,
+    iter_doc_id_candidates,
+    iter_saved_documents,
+)
 
 router = APIRouter()
+
+
+def evict_document_cache(doc_id: str):
+    for candidate in iter_doc_id_candidates(doc_id):
+        DOCUMENTS.pop(candidate, None)
 
 
 def serialize_document(record: dict):
@@ -62,6 +72,34 @@ def get_document_details(doc_id: str):
         "metadata": doc.get("metadata", {}),
     }
     return serialize_document(payload)
+
+
+@router.delete("/documents/{doc_id}")
+def delete_document_entry(doc_id: str):
+    deleted = delete_saved_document(doc_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Documento não encontrado")
+
+    evict_document_cache(deleted["doc_id"])
+
+    return {
+        "doc_id": deleted["doc_id"],
+        "removed": True,
+        "removed_files": deleted["removed_files"],
+    }
+
+
+@router.delete("/documents")
+def clear_document_library():
+    deleted_documents = clear_saved_documents()
+
+    for deleted in deleted_documents:
+        evict_document_cache(deleted["doc_id"])
+
+    return {
+        "removed_count": len(deleted_documents),
+        "removed_doc_ids": [deleted["doc_id"] for deleted in deleted_documents],
+    }
 
 
 @router.get("/system/status")

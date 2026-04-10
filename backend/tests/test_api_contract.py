@@ -185,6 +185,50 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(payload["sources"][0]["page"], 0)
         self.assertIn("StudyIA Copilot", payload["sources"][0]["text"])
 
+    def test_delete_document_removes_assets_and_catalog_entry(self) -> None:
+        upload_payload = self.upload_sample_pdf("cleanup-proof.pdf")
+        doc_id = upload_payload["doc_id"]
+        pdf_path = self.upload_path / f"{doc_id}.pdf"
+        _, json_path = storage_module.get_paths(doc_id)
+
+        self.assertTrue(pdf_path.exists())
+        self.assertTrue(json_path.exists())
+
+        delete_response = self.client.delete(f"/api/documents/{doc_id}")
+
+        self.assertEqual(delete_response.status_code, 200, delete_response.text)
+        payload = delete_response.json()
+
+        self.assertTrue(payload["removed"])
+        self.assertEqual(payload["doc_id"], doc_id)
+        self.assertFalse(pdf_path.exists())
+        self.assertFalse(json_path.exists())
+        self.assertNotIn(doc_id, query_module.DOCUMENTS)
+
+        catalog_response = self.client.get("/api/documents")
+        self.assertEqual(catalog_response.status_code, 200)
+        self.assertEqual(catalog_response.json()["documents"], [])
+
+        pdf_response = self.client.get(f"/api/pdf/{doc_id}")
+        self.assertEqual(pdf_response.status_code, 404)
+
+    def test_clear_documents_endpoint_removes_all_uploaded_assets(self) -> None:
+        first_upload = self.upload_sample_pdf("first.pdf")
+        second_upload = self.upload_sample_pdf("second.pdf")
+
+        response = self.client.delete("/api/documents")
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+
+        self.assertEqual(payload["removed_count"], 2)
+        self.assertCountEqual(
+            payload["removed_doc_ids"],
+            [first_upload["doc_id"], second_upload["doc_id"]],
+        )
+        self.assertEqual(list(self.upload_path.iterdir()), [])
+        self.assertEqual(list(self.data_path.iterdir()), [])
+
     def test_documents_endpoint_supports_legacy_saved_payloads(self) -> None:
         legacy_document = [
             {

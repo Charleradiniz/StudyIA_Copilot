@@ -14,6 +14,8 @@ import ViewerPanel from "./components/workspace/ViewerPanel";
 import {
   API_URL,
   askQuestion,
+  clearDocuments,
+  deleteDocument,
   getSystemStatus,
   listDocuments,
   uploadPdf,
@@ -183,6 +185,8 @@ export default function App() {
   const [pdfOpen, setPdfOpen] = useState(false);
   const [pdfFocusToken, setPdfFocusToken] = useState(0);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+  const [clearingDocuments, setClearingDocuments] = useState(false);
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
   );
@@ -294,6 +298,50 @@ export default function App() {
     setViewerDocId(null);
     setSelectedSource(null);
     setInput("");
+  };
+
+  const applyRemovedDocuments = (removedDocIds: string[]) => {
+    if (removedDocIds.length === 0) {
+      return;
+    }
+
+    const removedDocuments = new Set(removedDocIds);
+    const remainingDocuments = documents.filter((document) => !removedDocuments.has(document.id));
+    const shouldCloseViewer = Boolean(viewerDocId && removedDocuments.has(viewerDocId));
+
+    setDocuments(remainingDocuments);
+    setChats((currentChats) =>
+      currentChats.map((chat) =>
+        chat.activeDocId && removedDocuments.has(chat.activeDocId)
+          ? {
+              ...chat,
+              activeDocId: null,
+              updatedAt: Date.now(),
+            }
+          : chat,
+      ),
+    );
+    setSystemStatus((currentStatus) =>
+      currentStatus
+        ? {
+            ...currentStatus,
+            documentsIndexed: remainingDocuments.length,
+            workspaceDataAvailable: remainingDocuments.length > 0,
+          }
+        : currentStatus,
+    );
+
+    if (shouldCloseViewer) {
+      setViewerDocId(null);
+      setSelectedSource(null);
+      setPdfOpen(false);
+      return;
+    }
+
+    setSelectedSource((currentSource) => {
+      const sourceDocId = currentSource?.doc_id;
+      return sourceDocId && removedDocuments.has(sourceDocId) ? null : currentSource;
+    });
   };
 
   const streamAssistantResponse = async (
@@ -509,6 +557,90 @@ export default function App() {
     }
   };
 
+  const handleDeleteDocument = async (docId: string) => {
+    const targetDocument = documents.find((document) => document.id === docId);
+    if (!targetDocument) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `Delete "${targetDocument.name}"? This removes the PDF and indexed data from the workspace.`,
+    );
+    if (!shouldDelete) {
+      return;
+    }
+
+    setDeletingDocId(docId);
+
+    try {
+      await deleteDocument(docId);
+      applyRemovedDocuments([docId]);
+    } catch (error) {
+      console.error(error);
+
+      if (activeChat) {
+        updateChat(activeChat.id, (chat) => ({
+          ...chat,
+          updatedAt: Date.now(),
+          messages: [
+            ...chat.messages,
+            createAssistantMessage(
+              error instanceof Error
+                ? error.message
+                : "There was an error deleting the document.",
+            ),
+          ],
+        }));
+      }
+    } finally {
+      setDeletingDocId(null);
+    }
+  };
+
+  const handleClearDocuments = async () => {
+    if (documents.length === 0) {
+      return;
+    }
+
+    const shouldClear = window.confirm(
+      `Delete all ${documents.length} document${documents.length === 1 ? "" : "s"}? This removes PDFs and indexed data from the workspace.`,
+    );
+    if (!shouldClear) {
+      return;
+    }
+
+    setClearingDocuments(true);
+
+    try {
+      const response = await clearDocuments();
+      const removedDocIds =
+        response.removed_doc_ids.length > 0
+          ? response.removed_doc_ids
+          : documents.map((document) => document.id);
+
+      applyRemovedDocuments(removedDocIds);
+    } catch (error) {
+      console.error(error);
+
+      if (activeChat) {
+        updateChat(activeChat.id, (chat) => ({
+          ...chat,
+          updatedAt: Date.now(),
+          messages: [
+            ...chat.messages,
+            createAssistantMessage(
+              error instanceof Error
+                ? error.message
+                : "There was an error clearing the library.",
+            ),
+          ],
+        }));
+      }
+    } finally {
+      setClearingDocuments(false);
+    }
+  };
+
   if (!activeChat) return null;
 
   return (
@@ -528,10 +660,14 @@ export default function App() {
           activeDocId={activeChat.activeDocId}
           activeNav={activeNav}
           chats={chats}
+          clearingDocuments={clearingDocuments}
+          deletingDocId={deletingDocId}
           documents={documents}
           systemStatus={systemStatus}
           uploading={uploading}
           onChangeNav={setActiveNav}
+          onClearDocuments={handleClearDocuments}
+          onDeleteDocument={handleDeleteDocument}
           onNewChat={startNewChat}
           onOpenUpload={() => fileInputRef.current?.click()}
           onSelectChat={(chatId) => {

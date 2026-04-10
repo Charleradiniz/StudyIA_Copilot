@@ -31,6 +31,17 @@ export type DocumentsResponse = {
   documents: DocumentSummaryResponse[];
 };
 
+export type DeleteDocumentResponse = {
+  doc_id: string;
+  removed: boolean;
+  removed_files: string[];
+};
+
+export type ClearDocumentsResponse = {
+  removed_count: number;
+  removed_doc_ids: string[];
+};
+
 export type SystemStatusResponse = {
   status: string;
   rag_mode: string;
@@ -113,4 +124,20 @@ export async function listDocuments() {
 export async function getSystemStatus() {
   const res = await fetch(`${API_URL}/api/system/status`);
   return parseResponse<SystemStatusResponse>(res);
+}
+
+export async function deleteDocument(docId: string) {
+  const res = await fetch(`${API_URL}/api/documents/${encodeURIComponent(docId)}`, {
+    method: "DELETE",
+  });
+
+  return parseResponse<DeleteDocumentResponse>(res);
+}
+
+export async function clearDocuments() {
+  const res = await fetch(`${API_URL}/api/documents`, {
+    method: "DELETE",
+  });
+
+  return parseResponse<ClearDocumentsResponse>(res);
 }

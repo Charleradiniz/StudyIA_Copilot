@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from app.config import DATA_DIR
+from app.config import DATA_DIR, UPLOAD_DIR
 
 try:
     import faiss
@@ -11,12 +11,65 @@ except Exception:
 
 DATA_PATH = Path(DATA_DIR)
 DATA_PATH.mkdir(parents=True, exist_ok=True)
+UPLOAD_PATH = Path(UPLOAD_DIR)
+UPLOAD_PATH.mkdir(parents=True, exist_ok=True)
+
+
+def iter_doc_id_candidates(doc_id: str):
+    raw_doc_id = (doc_id or "").strip()
+    if not raw_doc_id:
+        return []
+
+    normalized_doc_id = (
+        raw_doc_id[:-4]
+        if raw_doc_id.lower().endswith(".pdf")
+        else raw_doc_id
+    )
+
+    candidates = []
+    for candidate in (
+        raw_doc_id,
+        normalized_doc_id,
+        f"{normalized_doc_id}.pdf",
+    ):
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+
+    return candidates
 
 
 def get_paths(doc_id: str):
     faiss_path = DATA_PATH / f"{doc_id}.faiss"
     json_path = DATA_PATH / f"{doc_id}.json"
     return faiss_path, json_path
+
+
+def find_saved_doc_id(doc_id: str):
+    for candidate in iter_doc_id_candidates(doc_id):
+        _, json_path = get_paths(candidate)
+        if json_path.exists():
+            return candidate
+
+    return None
+
+
+def iter_upload_paths(doc_id: str, metadata=None):
+    paths = []
+
+    file_path = (metadata or {}).get("path")
+    if file_path:
+        paths.append(Path(file_path))
+
+    for candidate in iter_doc_id_candidates(doc_id):
+        if candidate.lower().endswith(".pdf"):
+            candidate_path = UPLOAD_PATH / candidate
+        else:
+            candidate_path = UPLOAD_PATH / f"{candidate}.pdf"
+
+        if candidate_path not in paths:
+            paths.append(candidate_path)
+
+    return paths
 
 
 def save_document(doc_id: str, documents, index, metadata=None):
@@ -63,6 +116,50 @@ def load_document(doc_id: str, *, load_index: bool = True):
         "index": index,
         "metadata": data.get("metadata", {}),
     }
+
+
+def delete_saved_document(doc_id: str):
+    saved_doc_id = find_saved_doc_id(doc_id)
+    if not saved_doc_id:
+        return None
+
+    loaded = load_document(saved_doc_id, load_index=False) or {}
+    metadata = loaded.get("metadata", {})
+    removed_files = []
+    candidate_ids = []
+
+    for candidate in iter_doc_id_candidates(doc_id) + iter_doc_id_candidates(saved_doc_id):
+        if candidate not in candidate_ids:
+            candidate_ids.append(candidate)
+
+    for candidate in candidate_ids:
+        faiss_path, json_path = get_paths(candidate)
+        for target_path in (faiss_path, json_path):
+            if target_path.exists():
+                target_path.unlink()
+                removed_files.append(str(target_path))
+
+    for upload_path in iter_upload_paths(saved_doc_id, metadata):
+        if upload_path.exists() and upload_path.is_file():
+            upload_path.unlink()
+            removed_files.append(str(upload_path))
+
+    return {
+        "doc_id": saved_doc_id,
+        "metadata": metadata,
+        "removed_files": sorted(set(removed_files)),
+    }
+
+
+def clear_saved_documents():
+    removed_documents = []
+
+    for record in list(iter_saved_documents()):
+        deleted = delete_saved_document(record["doc_id"])
+        if deleted:
+            removed_documents.append(deleted)
+
+    return removed_documents
 
 
 def iter_saved_documents():

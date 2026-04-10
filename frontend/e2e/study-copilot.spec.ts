@@ -77,6 +77,21 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
     });
   });
 
+  await page.route("http://127.0.0.1:8000/api/documents/doc-e2e", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        doc_id: "doc-e2e",
+        removed: true,
+        removed_files: [
+          "backend/uploads/doc-e2e.pdf",
+          "backend/data/doc-e2e.json",
+        ],
+      }),
+    });
+  });
+
   await page.goto("/");
 
   await expect(page.getByText("Research workspace")).toBeVisible();
@@ -102,4 +117,10 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
   await sourceButton.click();
 
   await expect(page.getByText("Focused on page 1")).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Delete Study Flow.pdf" }).click();
+
+  await expect(page.getByText("Upload your first PDF to build the workspace.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "No document open" })).toBeVisible();
 });

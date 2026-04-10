@@ -8,8 +8,12 @@ type Props = {
   chats: ChatSession[];
   documents: AppDocument[];
   systemStatus: SystemStatus | null;
+  clearingDocuments: boolean;
+  deletingDocId: string | null;
   uploading: boolean;
   onChangeNav: (nav: "workspace" | "documents" | "activity") => void;
+  onClearDocuments: () => void;
+  onDeleteDocument: (docId: string) => void;
   onNewChat: () => void;
   onOpenUpload: () => void;
   onSelectChat: (chatId: string) => void;
@@ -21,10 +25,14 @@ export default function SidebarPanel({
   activeDocId,
   activeNav,
   chats,
+  clearingDocuments,
+  deletingDocId,
   documents,
   systemStatus,
   uploading,
   onChangeNav,
+  onClearDocuments,
+  onDeleteDocument,
   onNewChat,
   onOpenUpload,
   onSelectChat,
@@ -152,7 +160,7 @@ export default function SidebarPanel({
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-[var(--panel)] p-4 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.8)]">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-white">Document library</h2>
                 <p className="text-xs text-[var(--muted-foreground)]">
@@ -160,11 +168,23 @@ export default function SidebarPanel({
                 </p>
               </div>
 
-              {uploading && (
-                <div className="h-2 w-16 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full w-1/2 animate-pulse rounded-full bg-[var(--accent)]" />
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {uploading && (
+                  <div className="h-2 w-16 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full w-1/2 animate-pulse rounded-full bg-[var(--accent)]" />
+                  </div>
+                )}
+                {documents.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={onClearDocuments}
+                    disabled={uploading || clearingDocuments || Boolean(deletingDocId)}
+                    className="rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1.5 text-[11px] font-medium text-rose-100 transition hover:border-rose-300/40 hover:bg-rose-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {clearingDocuments ? "Clearing..." : "Clear all"}
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -175,58 +195,75 @@ export default function SidebarPanel({
               ) : (
                 documents.map((document) => {
                   const isActive = activeDocId === document.id;
+                  const isDeleting = deletingDocId === document.id;
 
                   return (
-                    <button
+                    <div
                       key={document.id}
-                      type="button"
-                      onClick={() => onSelectDocument(document.id)}
                       className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                         isActive
                           ? "border-[var(--accent)] bg-[var(--accent-surface)]"
                           : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-white">
-                            {document.name}
-                          </p>
-                          <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-                            Added {formatRelativeTime(document.uploadedAt)}
-                          </p>
-                        </div>
-                        {isActive && (
-                          <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-medium text-white">
-                            Active
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-                        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[var(--muted-foreground)]">
-                          {document.pageCount} pages
-                        </span>
-                        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[var(--muted-foreground)]">
-                          {document.chunkCount} chunks
-                        </span>
-                        <span
-                          className={`rounded-full px-2 py-1 ${
-                            document.vectorReady
-                              ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
-                              : "border border-amber-300/20 bg-amber-300/10 text-amber-100"
-                          }`}
+                      <div className="flex items-start gap-3">
+                        <button
+                          type="button"
+                          onClick={() => onSelectDocument(document.id)}
+                          className="min-w-0 flex-1 text-left"
                         >
-                          {document.vectorReady ? "vector ready" : "lexical fallback"}
-                        </span>
-                      </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-white">
+                                {document.name}
+                              </p>
+                              <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                                Added {formatRelativeTime(document.uploadedAt)}
+                              </p>
+                            </div>
+                            {isActive && (
+                              <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-medium text-white">
+                                Active
+                              </span>
+                            )}
+                          </div>
 
-                      {document.preview && (
-                        <p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--muted-foreground)]">
-                          {document.preview}
-                        </p>
-                      )}
-                    </button>
+                          <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[var(--muted-foreground)]">
+                              {document.pageCount} pages
+                            </span>
+                            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[var(--muted-foreground)]">
+                              {document.chunkCount} chunks
+                            </span>
+                            <span
+                              className={`rounded-full px-2 py-1 ${
+                                document.vectorReady
+                                  ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
+                                  : "border border-amber-300/20 bg-amber-300/10 text-amber-100"
+                              }`}
+                            >
+                              {document.vectorReady ? "vector ready" : "lexical fallback"}
+                            </span>
+                          </div>
+
+                          {document.preview && (
+                            <p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--muted-foreground)]">
+                              {document.preview}
+                            </p>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => onDeleteDocument(document.id)}
+                          disabled={uploading || clearingDocuments || isDeleting}
+                          aria-label={`Delete ${document.name}`}
+                          className="shrink-0 rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1.5 text-[11px] font-medium text-rose-100 transition hover:border-rose-300/40 hover:bg-rose-400/15 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isDeleting ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    </div>
                   );
                 })
               )}
