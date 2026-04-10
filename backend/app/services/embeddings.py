@@ -15,5 +15,5 @@ def generate_embeddings(chunks: list[str]):
     if RAG_MODE != "full" or model is None:
         return []
 
-    embeddings = model.encode(chunks)
+    embeddings = model.encode(chunks, normalize_embeddings=True)
     return embeddings.tolist()
