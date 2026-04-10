@@ -27,12 +27,12 @@ export function createChat(title = "New conversation"): ChatSession {
   return {
     id: createId(),
     title,
-    activeDocId: null,
+    activeDocIds: [],
     createdAt: now,
     updatedAt: now,
     messages: [
       createAssistantMessage(
-        "Welcome back. Upload a PDF, pick a document, and ask anything about it.",
+        "Welcome back. Upload PDFs, pick one or more documents, and ask anything about them.",
       ),
     ],
   };

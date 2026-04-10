@@ -19,12 +19,13 @@ function MessageSkeleton() {
 
 type Props = {
   activeChat: ChatSession;
-  activeDocument: AppDocument | null;
+  activeDocuments: AppDocument[];
   documentsCount: number;
   input: string;
   isDesktop: boolean;
   loading: boolean;
   systemStatus: SystemStatus | null;
+  viewerDocument: AppDocument | null;
   viewerDocId: string | null;
   onChangeInput: (value: string) => void;
   onOpenPdf: () => void;
@@ -49,12 +50,13 @@ function renderMessageContent(message: ChatMessage) {
 
 export default function ChatWorkspace({
   activeChat,
-  activeDocument,
+  activeDocuments,
   documentsCount,
   input,
   isDesktop,
   loading,
   systemStatus,
+  viewerDocument,
   viewerDocId,
   onChangeInput,
   onOpenPdf,
@@ -63,6 +65,14 @@ export default function ChatWorkspace({
   onSend,
   chatEndRef,
 }: Props) {
+  const hasActiveDocuments = activeDocuments.length > 0;
+  const activeDocumentSummary =
+    activeDocuments.length === 0
+      ? "Link documents to start grounded Q&A"
+      : activeDocuments.length === 1
+        ? `Grounded on ${activeDocuments[0].name}`
+        : `Grounded on ${activeDocuments.length} PDFs at once`;
+
   return (
     <section className="flex min-h-0 flex-1 flex-col border-b border-white/10 lg:h-full lg:border-b-0 lg:border-r">
       <div className="shrink-0 border-b border-white/10 bg-[var(--panel)]/85 px-5 py-5 backdrop-blur">
@@ -75,33 +85,48 @@ export default function ChatWorkspace({
               {activeChat.title}
             </h2>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              {activeDocument
-                ? `Grounded on ${activeDocument.name}`
-                : "Link a document to start grounded Q&A"}
+              {activeDocumentSummary}
             </p>
 
-            {activeDocument && (
+            {hasActiveDocuments && (
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
-                  {activeDocument.pageCount} pages
+                  {activeDocuments.length} active PDF{activeDocuments.length === 1 ? "" : "s"}
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
-                  {activeDocument.chunkCount} chunks
+                  {activeDocuments.reduce((total, document) => total + document.pageCount, 0)} pages
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
+                  {activeDocuments.reduce((total, document) => total + document.chunkCount, 0)} chunks
                 </span>
                 <span
                   className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-                    activeDocument.vectorReady
+                    activeDocuments.every((document) => document.vectorReady)
                       ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
                       : "border border-amber-300/20 bg-amber-300/10 text-amber-100"
                   }`}
                 >
-                  {activeDocument.vectorReady ? "Vector retrieval ready" : "Lexical fallback active"}
+                  {activeDocuments.every((document) => document.vectorReady)
+                    ? "Vector retrieval ready"
+                    : "Mixed retrieval modes active"}
                 </span>
                 {systemStatus && (
                   <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
                     {systemStatus.ragMode} mode
                   </span>
                 )}
+                {activeDocuments.map((document) => (
+                  <span
+                    key={document.id}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                      viewerDocId === document.id
+                        ? "border-[var(--accent)] bg-[var(--accent-surface)] text-white"
+                        : "border-white/10 bg-white/5 text-[var(--muted-foreground)]"
+                    }`}
+                  >
+                    {document.name}
+                  </span>
+                ))}
               </div>
             )}
           </div>
@@ -176,9 +201,12 @@ export default function ChatWorkspace({
                               Source {source.id}
                             </span>
                             <span className="text-[11px] text-[var(--muted-foreground)] transition group-hover:text-white/80">
-                              {typeof source.page === "number"
-                                ? `Page ${source.page + 1}`
-                                : "Open in PDF"}
+                              {[
+                                activeDocuments.find((document) => document.id === source.doc_id)?.name,
+                                typeof source.page === "number" ? `Page ${source.page + 1}` : null,
+                              ]
+                                .filter(Boolean)
+                                .join(" - ") || "Open in PDF"}
                             </span>
                           </div>
                           <p className="line-clamp-3 text-sm leading-6 text-[var(--muted-foreground)] group-hover:text-white/90">
@@ -201,16 +229,16 @@ export default function ChatWorkspace({
           <div className="mb-3 flex items-center justify-between gap-3 px-2">
             <div>
               <p className="text-sm font-medium text-white">
-                {activeDocument ? activeDocument.name : "No document selected"}
+                {viewerDocument?.name ?? (hasActiveDocuments ? "Select a PDF in the viewer" : "No document selected")}
               </p>
               <p className="text-xs text-[var(--muted-foreground)]">
-                {activeDocument
-                  ? "Ask follow-up questions and inspect exact highlighted context."
-                  : "Use the sidebar to upload or activate a document."}
+                {hasActiveDocuments
+                  ? "Ask across all active PDFs and inspect the exact source document in the viewer."
+                  : "Use the sidebar to upload or activate one or more documents."}
               </p>
-              {activeDocument?.preview && (
+              {viewerDocument?.preview && (
                 <p className="mt-2 max-w-2xl line-clamp-2 text-xs leading-5 text-[var(--muted-foreground)]">
-                  {activeDocument.preview}
+                  {viewerDocument.preview}
                 </p>
               )}
             </div>
@@ -230,9 +258,9 @@ export default function ChatWorkspace({
                 value={input}
                 onChange={(event) => onChangeInput(event.target.value)}
                 placeholder={
-                  activeDocument
-                    ? "Ask a precise question about this document..."
-                    : "Upload or select a PDF to unlock grounded answers..."
+                  hasActiveDocuments
+                    ? "Ask a precise question across the active PDFs..."
+                    : "Upload or select PDFs to unlock grounded answers..."
                 }
                 rows={3}
                 className="min-h-[104px] w-full resize-none rounded-[22px] border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[var(--muted-foreground)] focus:border-[var(--accent)]"

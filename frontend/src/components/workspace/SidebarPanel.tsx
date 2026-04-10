@@ -3,7 +3,7 @@ import type { AppDocument, ChatSession } from "../../app/types";
 
 type Props = {
   activeChatId: string;
-  activeDocId: string | null;
+  activeDocIds: string[];
   activeNav: "workspace" | "documents" | "activity";
   chats: ChatSession[];
   documents: AppDocument[];
@@ -20,12 +20,12 @@ type Props = {
   onNewChat: () => void;
   onOpenUpload: () => void;
   onSelectChat: (chatId: string) => void;
-  onSelectDocument: (docId: string) => void;
+  onToggleDocument: (docId: string) => void;
 };
 
 export default function SidebarPanel({
   activeChatId,
-  activeDocId,
+  activeDocIds,
   activeNav,
   chats,
   clearingChats,
@@ -42,10 +42,23 @@ export default function SidebarPanel({
   onNewChat,
   onOpenUpload,
   onSelectChat,
-  onSelectDocument,
+  onToggleDocument,
 }: Props) {
   const hasMeaningfulHistory = (chat: ChatSession) =>
     chat.messages.some((message) => message.role === "user");
+  const getChatDocumentSummary = (chat: ChatSession) => {
+    const linkedDocuments = documents.filter((doc) => chat.activeDocIds.includes(doc.id));
+
+    if (linkedDocuments.length === 0) {
+      return "No document linked";
+    }
+
+    if (linkedDocuments.length === 1) {
+      return linkedDocuments[0].name;
+    }
+
+    return `${linkedDocuments.length} documents linked`;
+  };
 
   const canManageChats = chats.length > 1 || chats.some(hasMeaningfulHistory);
   const showDocuments = activeNav === "workspace" || activeNav === "documents";
@@ -115,7 +128,8 @@ export default function SidebarPanel({
                 <div>
                   <h2 className="text-sm font-semibold text-white">Document library</h2>
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    {documents.length} document{documents.length === 1 ? "" : "s"} indexed
+                    {documents.length} document{documents.length === 1 ? "" : "s"} indexed,{" "}
+                    {activeDocIds.length} active in this chat
                   </p>
                 </div>
 
@@ -145,7 +159,7 @@ export default function SidebarPanel({
                   </div>
                 ) : (
                   documents.map((document) => {
-                    const isActive = activeDocId === document.id;
+                    const isActive = activeDocIds.includes(document.id);
                     const isDeleting = deletingDocId === document.id;
 
                     return (
@@ -160,7 +174,8 @@ export default function SidebarPanel({
                         <div className="flex items-start gap-3">
                           <button
                             type="button"
-                            onClick={() => onSelectDocument(document.id)}
+                            onClick={() => onToggleDocument(document.id)}
+                            aria-pressed={isActive}
                             className="min-w-0 flex-1 text-left"
                           >
                             <div className="flex items-center justify-between gap-3">
@@ -169,12 +184,13 @@ export default function SidebarPanel({
                                   {document.name}
                                 </p>
                                 <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-                                  Added {formatRelativeTime(document.uploadedAt)}
+                                  Added {formatRelativeTime(document.uploadedAt)}. Click to{" "}
+                                  {isActive ? "remove from" : "include in"} active answers.
                                 </p>
                               </div>
                               {isActive && (
                                 <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-medium text-white">
-                                  Active
+                                  Included
                                 </span>
                               )}
                             </div>
@@ -246,7 +262,6 @@ export default function SidebarPanel({
 
               <div className="space-y-2">
                 {chats.map((chat) => {
-                  const linkedDocument = documents.find((doc) => doc.id === chat.activeDocId);
                   const isCurrent = chat.id === activeChatId;
                   const isDeleting = deletingChatId === chat.id;
                   const canDeleteChat = chats.length > 1 || hasMeaningfulHistory(chat);
@@ -282,7 +297,7 @@ export default function SidebarPanel({
 
                           <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--muted-foreground)]">
                             <span>{chat.messages.length} messages</span>
-                            <span>{linkedDocument?.name ?? "No document linked"}</span>
+                            <span>{getChatDocumentSummary(chat)}</span>
                           </div>
                         </button>
 

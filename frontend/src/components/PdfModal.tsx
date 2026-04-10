@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect } from "react";
+import type { AppDocument } from "../app/types";
 
 const PdfViewer = lazy(() => import("./PdfViewer"));
 
@@ -10,19 +11,25 @@ type Highlight = {
 };
 
 type Props = {
+  activeDocuments: AppDocument[];
   open: boolean;
   onClose: () => void;
   fileUrl: string;
   highlight?: Highlight | null;
   focusToken: number;
+  viewerDocId: string | null;
+  onSelectViewerDoc: (docId: string) => void;
 };
 
 export default function PdfModal({
+  activeDocuments,
   open,
   onClose,
   fileUrl,
   highlight,
   focusToken,
+  viewerDocId,
+  onSelectViewerDoc,
 }: Props) {
   const isValidUrl = fileUrl.trim().length > 0;
 
@@ -73,6 +80,25 @@ export default function PdfModal({
             Close
           </button>
         </div>
+
+        {activeDocuments.length > 1 && (
+          <div className="flex shrink-0 flex-wrap gap-2 border-b border-white/10 px-4 py-3">
+            {activeDocuments.map((document) => (
+              <button
+                key={document.id}
+                type="button"
+                onClick={() => onSelectViewerDoc(document.id)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  viewerDocId === document.id
+                    ? "border-[var(--accent)] bg-[var(--accent-surface)] text-white"
+                    : "border-white/10 bg-white/5 text-[var(--muted-foreground)]"
+                }`}
+              >
+                {document.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex h-full w-full flex-1 overflow-hidden">
           {isValidUrl ? (

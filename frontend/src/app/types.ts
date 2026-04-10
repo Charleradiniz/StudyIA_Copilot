@@ -25,7 +25,7 @@ export type ConversationTurn = {
 export type ChatSession = {
   id: string;
   title: string;
-  activeDocId: string | null;
+  activeDocIds: string[];
   messages: ChatMessage[];
   createdAt: number;
   updatedAt: number;

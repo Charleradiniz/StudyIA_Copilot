@@ -39,6 +39,7 @@ FOLLOW_UP_HINTS = {
 class AskRequest(BaseModel):
     question: str
     doc_id: str | None = None
+    doc_ids: list[str] | None = None
     history: list[dict] | None = None
 
 
@@ -109,6 +110,20 @@ def normalize_loaded(doc_id: str, loaded: dict):
     }
 
 
+def normalize_requested_doc_ids(data: AskRequest) -> list[str]:
+    requested_doc_ids: list[str] = []
+
+    for candidate in [data.doc_id, *(data.doc_ids or [])]:
+        if not isinstance(candidate, str):
+            continue
+
+        normalized = candidate.strip()
+        if normalized and normalized not in requested_doc_ids:
+            requested_doc_ids.append(normalized)
+
+    return requested_doc_ids
+
+
 # =========================
 # CONTEXT
 # =========================
@@ -163,6 +178,41 @@ def get_document(doc_id: str):
 
     DOCUMENTS[doc_id] = doc
     return doc
+
+
+def resolve_documents(requested_doc_ids: list[str]):
+    if requested_doc_ids:
+        docs = []
+
+        for requested_doc_id in requested_doc_ids:
+            doc = get_document(requested_doc_id)
+            if not doc:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Documento nao encontrado ou invalido: {requested_doc_id}",
+                )
+            docs.append(doc)
+
+        return docs
+
+    docs = []
+
+    if not os.path.exists(DATA_DIR):
+        raise HTTPException(status_code=500, detail="DATA_DIR nao encontrado")
+
+    for file in os.listdir(DATA_DIR):
+        if not file.endswith(".json"):
+            continue
+
+        current_id = file.replace(".json", "")
+        doc = get_document(current_id)
+        if doc:
+            docs.append(doc)
+
+    if not docs:
+        raise HTTPException(status_code=404, detail="Nenhum documento disponivel")
+
+    return docs
 
 
 # =========================
@@ -253,81 +303,47 @@ def all_chunks(documents, k=8):
     return first_chunks(documents, k=k)
 
 
+def gather_results(docs, question: str, effective_question: str):
+    all_results = []
+
+    for doc in docs:
+        if RAG_MODE != "full" and len(doc.get("documents", [])) <= 12:
+            results = all_chunks(doc.get("documents", []), k=8)
+        else:
+            results = run_search(doc, effective_question)
+            if not results:
+                results = lexical_search(doc.get("documents", []), effective_question)
+            if not results and is_summary_query(question):
+                results = first_chunks(doc.get("documents", []), k=5)
+        all_results.extend(results)
+
+    return all_results
+
+
 # =========================
 # MAIN ENDPOINT
 # =========================
 @router.post("/ask")
 async def ask_question(data: AskRequest):
     request_started_at = perf_counter()
+    requested_doc_ids = normalize_requested_doc_ids(data)
+
     try:
         question = rewrite_query(data.question)
-        doc_id = data.doc_id
         effective_question = build_effective_query(question, data.history)
 
         if not question:
-            raise HTTPException(status_code=400, detail="question é obrigatório")
+            raise HTTPException(status_code=400, detail="question e obrigatorio")
 
-        all_results = []
         retrieval_started_at = perf_counter()
-
-        # =========================
-        # SINGLE DOC MODE
-        # =========================
-        if doc_id:
-            doc = get_document(doc_id)
-
-            if not doc:
-                raise HTTPException(status_code=404, detail="Documento não encontrado ou inválido")
-
-            if RAG_MODE != "full" and len(doc.get("documents", [])) <= 12:
-                all_results.extend(all_chunks(doc.get("documents", []), k=8))
-            else:
-                all_results.extend(run_search(doc, effective_question))
-                if not all_results:
-                    all_results.extend(lexical_search(doc.get("documents", []), effective_question))
-                if not all_results and is_summary_query(question):
-                    all_results.extend(first_chunks(doc.get("documents", []), k=5))
-
-        # =========================
-        # MULTI DOC MODE
-        # =========================
-        else:
-            docs = []
-
-            if not os.path.exists(DATA_DIR):
-                raise HTTPException(status_code=500, detail="DATA_DIR não encontrado")
-
-            for file in os.listdir(DATA_DIR):
-                if file.endswith(".json"):
-                    current_id = file.replace(".json", "")
-
-                    doc = get_document(current_id)
-                    if doc:
-                        docs.append(doc)
-
-            if not docs:
-                raise HTTPException(status_code=404, detail="Nenhum documento disponível")
-
-            for doc in docs:
-                if RAG_MODE != "full" and len(doc.get("documents", [])) <= 12:
-                    results = all_chunks(doc.get("documents", []), k=8)
-                else:
-                    results = run_search(doc, effective_question)
-                    if not results:
-                        results = lexical_search(doc.get("documents", []), effective_question)
-                    if not results and is_summary_query(question):
-                        results = first_chunks(doc.get("documents", []), k=5)
-                all_results.extend(results)
-
+        docs = resolve_documents(requested_doc_ids)
+        all_results = gather_results(docs, question, effective_question)
         retrieval_ms = round((perf_counter() - retrieval_started_at) * 1000, 2)
 
-        # =========================
-        # NO RESULTS
-        # =========================
         if not all_results:
             logger.info(
-                "ask_no_results doc_id=%s question=%r effective_question=%r history_turns=%s retrieval_ms=%s",
-                doc_id,
+                "ask_no_results doc_ids=%s question=%r effective_question=%r history_turns=%s retrieval_ms=%s",
+                requested_doc_ids or None,
                 question[:200],
                 effective_question[:300],
                 len(data.history or []),
@@ -335,13 +351,10 @@ async def ask_question(data: AskRequest):
             )
             return {
                 "question": question,
-                "answer": "Não encontrei informações relevantes no documento.",
+                "answer": "Nao encontrei informacoes relevantes no documento.",
                 "sources": [],
             }
 
-        # =========================
-        # RERANK SAFE
-        # =========================
         candidate_chunks = [chunk for chunk in all_results[:20] if chunk.get("text")]
         rerank_started_at = perf_counter()
         top_chunks = (
@@ -349,8 +362,9 @@ async def ask_question(data: AskRequest):
             if candidate_chunks and RAG_MODE == "full"
             else candidate_chunks[:5]
         )
-        if not top_chunks and doc_id:
-            doc = get_document(doc_id)
+
+        if not top_chunks and len(requested_doc_ids) == 1:
+            doc = get_document(requested_doc_ids[0])
             if doc:
                 if RAG_MODE != "full" and len(doc.get("documents", [])) <= 12:
                     top_chunks = all_chunks(doc.get("documents", []), k=8)
@@ -362,8 +376,8 @@ async def ask_question(data: AskRequest):
 
         if not top_chunks:
             logger.info(
-                "ask_no_top_chunks doc_id=%s question=%r effective_question=%r history_turns=%s retrieval_ms=%s rerank_ms=%s",
-                doc_id,
+                "ask_no_top_chunks doc_ids=%s question=%r effective_question=%r history_turns=%s retrieval_ms=%s rerank_ms=%s",
+                requested_doc_ids or None,
                 question[:200],
                 effective_question[:300],
                 len(data.history or []),
@@ -372,13 +386,10 @@ async def ask_question(data: AskRequest):
             )
             return {
                 "question": question,
-                "answer": "Não encontrei informações relevantes no documento.",
+                "answer": "Nao encontrei informacoes relevantes no documento.",
                 "sources": [],
             }
 
-        # =========================
-        # CONTEXT + LLM
-        # =========================
         context = build_context(top_chunks)
         llm_started_at = perf_counter()
         answer = generate_answer(question, context, data.history)
@@ -386,8 +397,8 @@ async def ask_question(data: AskRequest):
         total_ms = round((perf_counter() - request_started_at) * 1000, 2)
 
         logger.info(
-            "ask_completed doc_id=%s rag_mode=%s question=%r effective_question=%r history_turns=%s retrieval_results=%s selected_chunks=%s retrieval_ms=%s rerank_ms=%s llm_ms=%s total_ms=%s",
-            doc_id,
+            "ask_completed doc_ids=%s rag_mode=%s question=%r effective_question=%r history_turns=%s retrieval_results=%s selected_chunks=%s retrieval_ms=%s rerank_ms=%s llm_ms=%s total_ms=%s",
+            requested_doc_ids or None,
             RAG_MODE,
             question[:200],
             effective_question[:300],
@@ -400,9 +411,6 @@ async def ask_question(data: AskRequest):
             total_ms,
         )
 
-        # =========================
-        # RESPONSE
-        # =========================
         return {
             "question": question,
             "answer": answer,
@@ -412,8 +420,8 @@ async def ask_question(data: AskRequest):
     except Exception as error:
         if isinstance(error, HTTPException):
             logger.warning(
-                "ask_http_error doc_id=%s question=%r status_code=%s detail=%r",
-                data.doc_id,
+                "ask_http_error doc_ids=%s question=%r status_code=%s detail=%r",
+                requested_doc_ids or None,
                 (data.question or "")[:200],
                 error.status_code,
                 error.detail,
@@ -422,8 +430,8 @@ async def ask_question(data: AskRequest):
         print("ERRO NO /ASK")
         traceback.print_exc()
         logger.exception(
-            "ask_unhandled_error doc_id=%s question=%r",
-            data.doc_id,
+            "ask_unhandled_error doc_ids=%s question=%r",
+            requested_doc_ids or None,
             (data.question or "")[:200],
         )
         raise HTTPException(status_code=500, detail=str(error))

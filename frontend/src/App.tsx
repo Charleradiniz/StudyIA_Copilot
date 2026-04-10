@@ -2,6 +2,7 @@ import { startTransition, useEffect, useMemo, useRef, useState, type ChangeEvent
 import { createAssistantMessage, createChat, createId } from "./app/chat-utils";
 import type {
   AppDocument,
+  ChatMessage,
   ChatSession,
   ConversationTurn,
   Source,
@@ -78,6 +79,91 @@ function normalizeDocument(
   };
 }
 
+function normalizeActiveDocIds(value: unknown, legacyValue?: unknown) {
+  const ids = Array.isArray(value)
+    ? value
+    : typeof legacyValue === "string" && legacyValue
+      ? [legacyValue]
+      : [];
+
+  return [...new Set(ids)].filter(
+    (docId): docId is string => typeof docId === "string" && docId.trim().length > 0,
+  );
+}
+
+function normalizeChatMessage(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const message = value as Partial<ChatMessage> & {
+    id?: unknown;
+    role?: unknown;
+    content?: unknown;
+    sources?: unknown;
+    streaming?: unknown;
+  };
+
+  if (
+    typeof message.id !== "string" ||
+    (message.role !== "user" && message.role !== "assistant") ||
+    typeof message.content !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    sources: Array.isArray(message.sources)
+      ? message.sources.filter((source): source is Source => Boolean(source) && typeof source === "object")
+      : undefined,
+    streaming: Boolean(message.streaming),
+  };
+}
+
+function normalizeChat(value: unknown): ChatSession | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const chat = value as {
+    id?: unknown;
+    title?: unknown;
+    activeDocIds?: unknown;
+    activeDocId?: unknown;
+    messages?: unknown;
+    createdAt?: unknown;
+    updatedAt?: unknown;
+  };
+
+  if (
+    typeof chat.id !== "string" ||
+    typeof chat.title !== "string" ||
+    !Array.isArray(chat.messages)
+  ) {
+    return null;
+  }
+
+  const messages = chat.messages
+    .map((message) => normalizeChatMessage(message))
+    .filter((message): message is NonNullable<ReturnType<typeof normalizeChatMessage>> => Boolean(message));
+
+  if (messages.length === 0) {
+    return null;
+  }
+
+  return {
+    id: chat.id,
+    title: chat.title,
+    activeDocIds: normalizeActiveDocIds(chat.activeDocIds, chat.activeDocId),
+    messages,
+    createdAt: toTimestamp(chat.createdAt),
+    updatedAt: toTimestamp(chat.updatedAt),
+  };
+}
+
 function mapApiDocument(document: DocumentSummaryResponse): AppDocument {
   return {
     id: document.doc_id,
@@ -131,7 +217,9 @@ function loadPersistedWorkspace(): PersistedWorkspace | null {
       return null;
     }
 
-    const parsed = JSON.parse(raw) as Partial<PersistedWorkspace>;
+    const parsed = JSON.parse(raw) as Partial<PersistedWorkspace> & {
+      chats?: unknown[];
+    };
     if (!Array.isArray(parsed.documents) || !Array.isArray(parsed.chats) || parsed.chats.length === 0) {
       return null;
     }
@@ -139,6 +227,13 @@ function loadPersistedWorkspace(): PersistedWorkspace | null {
     const documents = parsed.documents
       .map((document) => normalizeDocument(document as Partial<AppDocument>))
       .filter((document): document is AppDocument => Boolean(document));
+    const chats = parsed.chats
+      .map((chat) => normalizeChat(chat))
+      .filter((chat): chat is ChatSession => Boolean(chat));
+
+    if (chats.length === 0) {
+      return null;
+    }
 
     const activeNav =
       parsed.activeNav === "documents" || parsed.activeNav === "activity"
@@ -147,11 +242,11 @@ function loadPersistedWorkspace(): PersistedWorkspace | null {
 
     return {
       documents,
-      chats: parsed.chats,
+      chats,
       activeChatId:
         typeof parsed.activeChatId === "string" && parsed.activeChatId
           ? parsed.activeChatId
-          : parsed.chats[0].id,
+          : chats[0].id,
       activeNav,
       viewerDocId: typeof parsed.viewerDocId === "string" ? parsed.viewerDocId : null,
     };
@@ -198,9 +293,17 @@ export default function App() {
     [activeChatId, chats],
   );
 
-  const activeDocument = useMemo(
-    () => documents.find((doc) => doc.id === activeChat?.activeDocId) ?? null,
-    [activeChat?.activeDocId, documents],
+  const activeDocuments = useMemo(
+    () =>
+      (activeChat?.activeDocIds ?? [])
+        .map((docId) => documents.find((document) => document.id === docId) ?? null)
+        .filter((document): document is AppDocument => Boolean(document)),
+    [activeChat?.activeDocIds, documents],
+  );
+
+  const viewerDocument = useMemo(
+    () => documents.find((doc) => doc.id === viewerDocId) ?? null,
+    [documents, viewerDocId],
   );
 
   useEffect(() => {
@@ -223,9 +326,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!activeChat?.activeDocId) return;
-    setViewerDocId((current) => current ?? activeChat.activeDocId);
-  }, [activeChat?.activeDocId]);
+    const nextActiveDocIds = activeChat?.activeDocIds ?? [];
+
+    if (nextActiveDocIds.length === 0) {
+      setViewerDocId(null);
+      setPdfOpen(false);
+      return;
+    }
+
+    setViewerDocId((current) =>
+      current && nextActiveDocIds.includes(current) ? current : nextActiveDocIds[0],
+    );
+  }, [activeChat?.activeDocIds]);
 
   useEffect(() => {
     if (typeof window === "undefined" || chats.length === 0 || !activeChat) return;
@@ -282,7 +394,7 @@ export default function App() {
 
   const activateChat = (chat: ChatSession, options?: { clearInput?: boolean }) => {
     setActiveChatId(chat.id);
-    setViewerDocId(chat.activeDocId ?? null);
+    setViewerDocId(chat.activeDocIds[0] ?? null);
     setSelectedSource(null);
     setPdfOpen(false);
 
@@ -291,16 +403,40 @@ export default function App() {
     }
   };
 
-  const setActiveChatDocument = (docId: string | null) => {
+  const setViewerDocument = (docId: string) => {
+    setViewerDocId(docId);
+    setSelectedSource((currentSource) =>
+      currentSource?.doc_id && currentSource.doc_id !== docId ? null : currentSource,
+    );
+    setPdfFocusToken((current) => current + 1);
+  };
+
+  const toggleActiveChatDocument = (docId: string) => {
     if (!activeChat) return;
+
+    const isActive = activeChat.activeDocIds.includes(docId);
+    const nextActiveDocIds = isActive
+      ? activeChat.activeDocIds.filter((activeDocId) => activeDocId !== docId)
+      : [...activeChat.activeDocIds, docId];
 
     updateChat(activeChat.id, (chat) => ({
       ...chat,
-      activeDocId: docId,
+      activeDocIds: isActive
+        ? chat.activeDocIds.filter((activeDocId) => activeDocId !== docId)
+        : [...chat.activeDocIds, docId],
       updatedAt: Date.now(),
     }));
 
-    setViewerDocId(docId);
+    if (!isActive) {
+      setViewerDocId(docId);
+    } else if (viewerDocId === docId) {
+      setViewerDocId(nextActiveDocIds[0] ?? null);
+    }
+
+    if (isActive && nextActiveDocIds.length === 0) {
+      setPdfOpen(false);
+    }
+
     setSelectedSource(null);
   };
 
@@ -344,10 +480,10 @@ export default function App() {
     setDocuments(remainingDocuments);
     setChats((currentChats) =>
       currentChats.map((chat) =>
-        chat.activeDocId && removedDocuments.has(chat.activeDocId)
+        chat.activeDocIds.some((docId) => removedDocuments.has(docId))
           ? {
               ...chat,
-              activeDocId: null,
+              activeDocIds: chat.activeDocIds.filter((docId) => !removedDocuments.has(docId)),
               updatedAt: Date.now(),
             }
           : chat,
@@ -364,7 +500,10 @@ export default function App() {
     );
 
     if (shouldCloseViewer) {
-      setViewerDocId(null);
+      const fallbackViewerDocId =
+        activeChat?.activeDocIds.find((docId) => !removedDocuments.has(docId)) ?? null;
+
+      setViewerDocId(fallbackViewerDocId);
       setSelectedSource(null);
       setPdfOpen(false);
       return;
@@ -455,7 +594,9 @@ export default function App() {
 
       updateChat(targetChatId, (chat) => ({
         ...chat,
-        activeDocId: data.doc_id,
+        activeDocIds: chat.activeDocIds.includes(data.doc_id)
+          ? chat.activeDocIds
+          : [...chat.activeDocIds, data.doc_id],
         title: chat.title === "New conversation" ? data.name || file.name : chat.title,
         updatedAt: Date.now(),
         messages: [
@@ -496,16 +637,20 @@ export default function App() {
   };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      handleFileUpload(file);
+    const files = Array.from(event.target.files ?? []);
+    if (files.length > 0) {
+      void (async () => {
+        for (const file of files) {
+          await handleFileUpload(file);
+        }
+      })();
     }
 
     event.target.value = "";
   };
 
   const handleSelectSource = (source: Source) => {
-    const targetDocId = source.doc_id || activeChat?.activeDocId || null;
+    const targetDocId = source.doc_id || activeChat?.activeDocIds[0] || null;
 
     setSelectedSource({
       ...source,
@@ -523,13 +668,13 @@ export default function App() {
   const handleSend = async () => {
     if (!input.trim() || loading || !activeChat) return;
 
-    if (!activeChat.activeDocId) {
+    if (activeChat.activeDocIds.length === 0) {
       updateChat(activeChat.id, (chat) => ({
         ...chat,
         updatedAt: Date.now(),
         messages: [
           ...chat.messages,
-          createAssistantMessage("Select or upload a document before asking questions."),
+          createAssistantMessage("Select one or more documents before asking questions."),
         ],
       }));
       return;
@@ -537,10 +682,7 @@ export default function App() {
 
     const question = input.trim();
     const targetChatId = activeChat.id;
-    const targetDocId = activeChat.activeDocId;
-    if (!targetDocId) {
-      return;
-    }
+    const targetDocIds = activeChat.activeDocIds;
     const placeholderId = createId();
     const history: ConversationTurn[] = activeChat.messages
       .filter((message) => !message.streaming && message.content.trim())
@@ -565,7 +707,7 @@ export default function App() {
     }));
 
     try {
-      const data = await askQuestion(question, targetDocId, history);
+      const data = await askQuestion(question, targetDocIds, history);
       await streamAssistantResponse(
         targetChatId,
         placeholderId,
@@ -725,6 +867,7 @@ export default function App() {
           ref={fileInputRef}
           type="file"
           accept="application/pdf"
+          multiple
           onChange={handleFileChange}
           className="hidden"
           disabled={uploading}
@@ -732,7 +875,7 @@ export default function App() {
 
         <SidebarPanel
           activeChatId={activeChat.id}
-          activeDocId={activeChat.activeDocId}
+          activeDocIds={activeChat.activeDocIds}
           activeNav={activeNav}
           chats={chats}
           clearingChats={clearingChats}
@@ -754,18 +897,19 @@ export default function App() {
               activateChat(nextChat);
             }
           }}
-          onSelectDocument={(docId) => setActiveChatDocument(docId)}
+          onToggleDocument={(docId) => toggleActiveChatDocument(docId)}
         />
 
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_26%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_22%)] lg:flex-row">
           <ChatWorkspace
             activeChat={activeChat}
-            activeDocument={activeDocument}
+            activeDocuments={activeDocuments}
             documentsCount={documents.length}
             input={input}
             isDesktop={isDesktop}
             loading={loading}
             systemStatus={systemStatus}
+            viewerDocument={viewerDocument}
             viewerDocId={viewerDocId}
             onChangeInput={setInput}
             onOpenPdf={() => setPdfOpen(true)}
@@ -776,11 +920,12 @@ export default function App() {
           />
 
           <ViewerPanel
-            documents={documents}
+            activeDocuments={activeDocuments}
             focusToken={pdfFocusToken}
             pdfUrl={pdfUrl}
             selectedSource={selectedSource}
             viewerDocId={viewerDocId}
+            onSelectViewerDoc={setViewerDocument}
             onClearFocus={() => {
               setSelectedSource(null);
               setPdfFocusToken((current) => current + 1);
@@ -790,11 +935,14 @@ export default function App() {
       </div>
 
       <PdfModal
+        activeDocuments={activeDocuments}
         open={pdfOpen && !isDesktop}
         onClose={() => setPdfOpen(false)}
         fileUrl={pdfUrl}
         highlight={selectedSource}
         focusToken={pdfFocusToken}
+        viewerDocId={viewerDocId}
+        onSelectViewerDoc={setViewerDocument}
       />
     </div>
   );

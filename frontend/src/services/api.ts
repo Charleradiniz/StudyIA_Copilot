@@ -98,9 +98,10 @@ export async function uploadPdf(file: File) {
 
 export async function askQuestion(
   question: string,
-  docId: string,
+  docIds: string[],
   history: ConversationTurn[] = [],
 ) {
+  const normalizedDocIds = [...new Set(docIds.filter(Boolean))];
   const res = await fetch(`${API_URL}/api/ask`, {
     method: "POST",
     headers: {
@@ -108,7 +109,8 @@ export async function askQuestion(
     },
     body: JSON.stringify({
       question,
-      doc_id: docId,
+      doc_id: normalizedDocIds[0] ?? null,
+      doc_ids: normalizedDocIds,
       history,
     }),
   });
