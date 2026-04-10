@@ -740,7 +740,6 @@ export default function App() {
           deletingChatId={deletingChatId}
           deletingDocId={deletingDocId}
           documents={documents}
-          systemStatus={systemStatus}
           uploading={uploading}
           onChangeNav={setActiveNav}
           onClearChats={handleClearChats}

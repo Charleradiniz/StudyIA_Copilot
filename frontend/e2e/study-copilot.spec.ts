@@ -96,8 +96,22 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
   page.on("dialog", (dialog) => dialog.accept());
 
   await expect(page.getByText("Research workspace")).toBeVisible();
-  await expect(page.getByText("Platform readiness")).toBeVisible();
-  await expect(page.getByText("Vector")).toBeVisible();
+  await expect(page.getByText("Document library")).toBeVisible();
+  await expect(page.getByText("Chat history")).toBeVisible();
+
+  await page.getByRole("button", { name: "Documents" }).click();
+  await expect(page.getByText("Document library")).toBeVisible();
+  await expect(page.getByText("Upload your first PDF to build the workspace.")).toBeVisible();
+  await expect(page.getByText("Chat history")).not.toBeVisible();
+
+  await page.getByRole("button", { name: "Activity" }).click();
+  await expect(page.getByText("Chat history")).toBeVisible();
+  await expect(page.getByText("No document linked")).toBeVisible();
+  await expect(page.getByText("Document library")).not.toBeVisible();
+
+  await page.getByRole("button", { name: "Workspace" }).click();
+  await expect(page.getByText("Document library")).toBeVisible();
+  await expect(page.getByText("Chat history")).toBeVisible();
 
   await page.locator('input[type="file"]').setInputFiles({
     name: "Study Flow.pdf",

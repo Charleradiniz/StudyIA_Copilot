@@ -133,12 +133,52 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByText("Research Plan.pdf")).toBeInTheDocument();
-    expect(screen.getByText("Platform readiness")).toBeInTheDocument();
-    expect(screen.getByText("Configured")).toBeInTheDocument();
-    expect(screen.getByText("Vector")).toBeInTheDocument();
+    expect(screen.getByText("Document library")).toBeInTheDocument();
+    expect(screen.getByText("Chat history")).toBeInTheDocument();
     expect(screen.getByText("8 chunks")).toBeInTheDocument();
     expect(screen.getByText("3 pages")).toBeInTheDocument();
-    expect(screen.getByText(/Model: gemini-2\.5-flash-lite/i)).toBeInTheDocument();
+  });
+
+  it("switches sidebar content across workspace, documents, and activity", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.endsWith("/api/documents")) {
+          return jsonResponse({
+            documents: [createDocument()],
+          });
+        }
+
+        if (url.endsWith("/api/system/status")) {
+          return jsonResponse(createSystemStatus());
+        }
+
+        throw new Error(`Unhandled request: ${url}`);
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText("Document library")).toBeInTheDocument();
+    expect(screen.getByText("Chat history")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Documents" }));
+
+    expect(screen.getByText("Document library")).toBeInTheDocument();
+    expect(screen.queryByText("Chat history")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Activity" }));
+
+    expect(screen.getByText("Chat history")).toBeInTheDocument();
+    expect(screen.queryByText("Document library")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Workspace" }));
+
+    expect(screen.getByText("Document library")).toBeInTheDocument();
+    expect(screen.getByText("Chat history")).toBeInTheDocument();
   });
 
   it("uploads a document and answers a grounded question", async () => {
