@@ -111,13 +111,17 @@ class ApiContractTests(unittest.TestCase):
         query_module.generate_answer = self.originals["generate_answer"]
         shutil.rmtree(self.root_path, ignore_errors=True)
 
-    def upload_sample_pdf(self, filename: str = "study-guide.pdf") -> dict:
+    def upload_sample_pdf(
+        self,
+        filename: str = "study-guide.pdf",
+        text: str = LONG_TEXT,
+    ) -> dict:
         response = self.client.post(
             "/api/upload",
             files={
                 "file": (
                     filename,
-                    io.BytesIO(build_pdf_bytes()),
+                    io.BytesIO(build_pdf_bytes(text)),
                     "application/pdf",
                 )
             },
@@ -184,6 +188,33 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(payload["sources"][0]["doc_id"], upload_payload["doc_id"])
         self.assertEqual(payload["sources"][0]["page"], 0)
         self.assertIn("StudyIA Copilot", payload["sources"][0]["text"])
+
+    def test_ask_accepts_multiple_active_documents(self) -> None:
+        first_upload = self.upload_sample_pdf(
+            "architecture.pdf",
+            text=("Architecture evidence for multi PDF retrieval. " * 8),
+        )
+        second_upload = self.upload_sample_pdf(
+            "operations.pdf",
+            text=("Operations evidence for multi PDF retrieval. " * 8),
+        )
+
+        ask_response = self.client.post(
+            "/api/ask",
+            json={
+                "question": "Compare the active PDFs",
+                "doc_ids": [first_upload["doc_id"], second_upload["doc_id"]],
+                "history": [],
+            },
+        )
+
+        self.assertEqual(ask_response.status_code, 200, ask_response.text)
+        payload = ask_response.json()
+        returned_doc_ids = {source["doc_id"] for source in payload["sources"]}
+
+        self.assertEqual(payload["answer"], "Mocked grounded answer.")
+        self.assertTrue(returned_doc_ids.issubset({first_upload["doc_id"], second_upload["doc_id"]}))
+        self.assertEqual(returned_doc_ids, {first_upload["doc_id"], second_upload["doc_id"]})
 
     def test_delete_document_removes_assets_and_catalog_entry(self) -> None:
         upload_payload = self.upload_sample_pdf("cleanup-proof.pdf")

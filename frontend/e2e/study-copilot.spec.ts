@@ -5,6 +5,7 @@ const TEST_PDF_BASE64 =
 
 test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
   const pdfBytes = Buffer.from(TEST_PDF_BASE64, "base64");
+  let uploadCount = 0;
 
   await page.route("http://127.0.0.1:8000/api/system/status", async (route) => {
     await route.fulfill({
@@ -33,23 +34,32 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
   });
 
   await page.route("http://127.0.0.1:8000/api/upload", async (route) => {
+    uploadCount += 1;
+    const suffix = String(uploadCount);
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        doc_id: "doc-e2e",
-        name: "Study Flow.pdf",
+        doc_id: `doc-e2e-${suffix}`,
+        name: uploadCount === 1 ? "Study Flow.pdf" : "Evidence Pack.pdf",
         chunks: 6,
         pages: 2,
         rag_mode: "full",
         vector_ready: true,
         uploaded_at: "2026-04-09T12:00:00.000Z",
-        preview: "A generated preview used in the end-to-end browser flow.",
+        preview: uploadCount === 1
+          ? "A generated preview used in the end-to-end browser flow."
+          : "A second active PDF to validate multi-document answers.",
       }),
     });
   });
 
   await page.route("http://127.0.0.1:8000/api/ask", async (route) => {
+    const body = route.request().postDataJSON();
+
+    expect(body.doc_ids).toEqual(["doc-e2e-1", "doc-e2e-2"]);
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -60,7 +70,7 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
           {
             id: 1,
             text: "This source backs the grounded answer and powers the viewer focus state.",
-            doc_id: "doc-e2e",
+            doc_id: "doc-e2e-2",
             chunk_id: 1,
             page: 0,
           },
@@ -69,7 +79,7 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
     });
   });
 
-  await page.route("http://127.0.0.1:8000/api/pdf/doc-e2e", async (route) => {
+  await page.route(/http:\/\/127\.0\.0\.1:8000\/api\/pdf\/doc-e2e-(1|2)/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/pdf",
@@ -77,16 +87,18 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
     });
   });
 
-  await page.route("http://127.0.0.1:8000/api/documents/doc-e2e", async (route) => {
+  await page.route(/http:\/\/127\.0\.0\.1:8000\/api\/documents\/doc-e2e-(1|2)/, async (route) => {
+    const docId = route.request().url().split("/").pop();
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        doc_id: "doc-e2e",
+        doc_id: docId,
         removed: true,
         removed_files: [
-          "backend/uploads/doc-e2e.pdf",
-          "backend/data/doc-e2e.json",
+          `backend/uploads/${docId}.pdf`,
+          `backend/data/${docId}.json`,
         ],
       }),
     });
@@ -118,8 +130,15 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
     mimeType: "application/pdf",
     buffer: pdfBytes,
   });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "Evidence Pack.pdf",
+    mimeType: "application/pdf",
+    buffer: pdfBytes,
+  });
 
   await expect(page.getByText(/indexed with 6 chunks across 2 pages/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Evidence Pack.pdf" })).toBeVisible();
+  await expect(page.getByText("2 active in this chat")).toBeVisible();
 
   await page
     .getByRole("textbox", { name: "Message" })
@@ -131,16 +150,21 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
   const sourceButton = page.locator('button:has-text("Source 1")').first();
   await sourceButton.click();
 
+  await expect(page.getByRole("heading", { name: "Evidence Pack.pdf" })).toBeVisible();
   await expect(page.getByText("Focused on page 1")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Study Flow.pdf", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Evidence Pack.pdf", exact: true }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Delete chat Study Flow.pdf" }).click();
 
   await expect(page.getByRole("heading", { name: "New conversation" })).toBeVisible();
   await expect(
-    page.getByText("Welcome back. Upload a PDF, pick a document, and ask anything about it."),
+    page.getByText("Welcome back. Upload PDFs, pick one or more documents, and ask anything about them."),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Delete Study Flow.pdf" }).click();
+  while ((await page.getByRole("button", { name: /Delete .*\.pdf/ }).count()) > 0) {
+    await page.getByRole("button", { name: /Delete .*\.pdf/ }).first().click();
+  }
 
   await expect(page.getByText("Upload your first PDF to build the workspace.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "No document open" })).toBeVisible();

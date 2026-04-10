@@ -1,16 +1,17 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import SidebarPanel from "./SidebarPanel";
 
 const baseProps = {
   activeChatId: "chat-1",
-  activeDocId: "doc-1",
+  activeDocIds: ["doc-1"],
   chats: [
     {
       id: "chat-1",
       title: "AI Portfolio Review",
-      activeDocId: "doc-1",
+      activeDocIds: ["doc-1"],
       messages: [
         {
           id: "msg-1",
@@ -44,15 +45,15 @@ const baseProps = {
   deletingChatId: null,
   deletingDocId: null,
   uploading: false,
-  onChangeNav: () => {},
-  onClearChats: () => {},
-  onClearDocuments: () => {},
-  onDeleteChat: () => {},
-  onDeleteDocument: () => {},
-  onNewChat: () => {},
-  onOpenUpload: () => {},
-  onSelectChat: () => {},
-  onSelectDocument: () => {},
+  onChangeNav: vi.fn(),
+  onClearChats: vi.fn(),
+  onClearDocuments: vi.fn(),
+  onDeleteChat: vi.fn(),
+  onDeleteDocument: vi.fn(),
+  onNewChat: vi.fn(),
+  onOpenUpload: vi.fn(),
+  onSelectChat: vi.fn(),
+  onToggleDocument: vi.fn(),
 };
 
 describe("SidebarPanel", () => {
@@ -62,6 +63,7 @@ describe("SidebarPanel", () => {
     expect(screen.getByText("Document library")).toBeInTheDocument();
     expect(screen.getByText("Chat history")).toBeInTheDocument();
     expect(screen.getAllByText("Architecture Notes.pdf")).toHaveLength(2);
+    expect(screen.getByText(/1 active in this chat/i)).toBeInTheDocument();
     expect(screen.getByText("11 chunks")).toBeInTheDocument();
     expect(screen.getByText("4 pages")).toBeInTheDocument();
     expect(screen.getByText("vector ready")).toBeInTheDocument();
@@ -91,5 +93,29 @@ describe("SidebarPanel", () => {
     expect(
       screen.queryByRole("button", { name: "Delete Architecture Notes.pdf" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("toggles a document into the active answer set", async () => {
+    const user = userEvent.setup();
+    const onToggleDocument = vi.fn();
+
+    render(
+      <SidebarPanel
+        {...baseProps}
+        activeDocIds={[]}
+        activeNav="workspace"
+        onToggleDocument={onToggleDocument}
+      />,
+    );
+
+    const documentButton = screen
+      .getAllByText("Architecture Notes.pdf")
+      .find((node) => node.closest("button"))?.closest("button");
+
+    expect(documentButton).toBeTruthy();
+
+    await user.click(documentButton as HTMLButtonElement);
+
+    expect(onToggleDocument).toHaveBeenCalledWith("doc-1");
   });
 });

@@ -8,15 +8,28 @@ vi.mock("./components/PdfModal", () => ({
 
 vi.mock("./components/workspace/ViewerPanel", () => ({
   default: ({
+    activeDocuments,
+    onSelectViewerDoc,
     viewerDocId,
     selectedSource,
   }: {
+    activeDocuments: { id: string; name: string }[];
+    onSelectViewerDoc: (docId: string) => void;
     viewerDocId: string | null;
     selectedSource: { page?: number } | null;
   }) => (
     <div data-testid="viewer-panel">
       viewer:{viewerDocId ?? "none"}|page:
       {typeof selectedSource?.page === "number" ? selectedSource.page + 1 : "none"}
+      {activeDocuments.map((document) => (
+        <button
+          key={document.id}
+          type="button"
+          onClick={() => onSelectViewerDoc(document.id)}
+        >
+          view:{document.name}
+        </button>
+      ))}
     </div>
   ),
 }));
@@ -84,7 +97,7 @@ function persistWorkspace(overrides: Partial<Record<string, unknown>> = {}) {
         {
           id: "chat-seeded",
           title: "Strategy Review",
-          activeDocId: "doc-1",
+          activeDocIds: ["doc-1"],
           messages: [
             {
               id: "msg-1",
@@ -181,6 +194,97 @@ describe("App", () => {
     expect(screen.getByText("Chat history")).toBeInTheDocument();
   });
 
+  it("asks across multiple active PDFs and switches the viewer to the sourced file", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url.endsWith("/api/documents") && method === "GET") {
+        return jsonResponse({
+          documents: [
+            createDocument(),
+            createDocument({
+              doc_id: "doc-2",
+              name: "System Notes.pdf",
+              chunks: 5,
+              pages: 2,
+              uploaded_at: "2026-04-10T12:00:00.000Z",
+              preview: "A second document to validate multi-PDF reasoning.",
+            }),
+          ],
+        });
+      }
+
+      if (url.endsWith("/api/system/status") && method === "GET") {
+        return jsonResponse(createSystemStatus({ documents_indexed: 2 }));
+      }
+
+      if (url.endsWith("/api/ask") && method === "POST") {
+        const body = JSON.parse(String(init?.body));
+        expect(body.doc_ids).toEqual(["doc-1", "doc-2"]);
+
+        return jsonResponse({
+          question: body.question,
+          answer: "Compared answer.",
+          sources: [
+            {
+              id: 1,
+              text: "This source came from the second active PDF.",
+              doc_id: "doc-2",
+              page: 1,
+              chunk_id: 4,
+            },
+          ],
+        });
+      }
+
+      throw new Error(`Unhandled request: ${method} ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText("Research Plan.pdf")).toBeInTheDocument();
+    expect(screen.getByText("System Notes.pdf")).toBeInTheDocument();
+
+    const firstDocumentButton = screen
+      .getAllByText("Research Plan.pdf")
+      .find((node) => node.closest("button"))?.closest("button");
+    const secondDocumentButton = screen
+      .getAllByText("System Notes.pdf")
+      .find((node) => node.closest("button"))?.closest("button");
+
+    expect(firstDocumentButton).toBeTruthy();
+    expect(secondDocumentButton).toBeTruthy();
+
+    await user.click(firstDocumentButton as HTMLButtonElement);
+    await user.click(secondDocumentButton as HTMLButtonElement);
+
+    await user.type(
+      screen.getByRole("textbox", { name: "Message" }),
+      "Compare both PDFs",
+    );
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Compared answer.")).toBeInTheDocument();
+
+    await user.click(screen.getByText("Source 1").closest("button") as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("viewer-panel")).toHaveTextContent("viewer:doc-2");
+      expect(screen.getByTestId("viewer-panel")).toHaveTextContent("page:2");
+    });
+
+    await user.click(screen.getByRole("button", { name: "view:Research Plan.pdf" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("viewer-panel")).toHaveTextContent("viewer:doc-1");
+      expect(screen.getByTestId("viewer-panel")).toHaveTextContent("page:none");
+    });
+  });
+
   it("uploads a document and answers a grounded question", async () => {
     const uploadedDocument = createDocument({
       doc_id: "doc-uploaded",
@@ -219,6 +323,7 @@ describe("App", () => {
       if (url.endsWith("/api/ask") && method === "POST") {
         const body = JSON.parse(String(init?.body));
         expect(body.doc_id).toBe("doc-uploaded");
+        expect(body.doc_ids).toEqual(["doc-uploaded"]);
         expect(body.question).toBe("What is the core promise?");
 
         return jsonResponse({
@@ -357,7 +462,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Delete chat Strategy Review" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Welcome back. Upload a PDF, pick a document, and ask anything about it.")).toBeInTheDocument();
+      expect(screen.getByText("Welcome back. Upload PDFs, pick one or more documents, and ask anything about them.")).toBeInTheDocument();
       expect(screen.getByTestId("viewer-panel")).toHaveTextContent("viewer:none");
       expect(screen.getByRole("heading", { name: "New conversation" })).toBeInTheDocument();
     });
