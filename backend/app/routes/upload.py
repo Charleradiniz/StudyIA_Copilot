@@ -152,6 +152,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         )
 
         DOCUMENTS[doc_id] = {
+            "doc_id": doc_id,
             "documents": documents,
             "index": index,
             "name": original_name,

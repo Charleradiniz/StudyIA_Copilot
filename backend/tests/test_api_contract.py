@@ -2,9 +2,9 @@ import os
 import io
 import json
 import shutil
-import tempfile
 import unittest
 from pathlib import Path
+from uuid import uuid4
 
 import fitz
 from fastapi import FastAPI
@@ -49,9 +49,10 @@ def build_pdf_bytes(text: str = LONG_TEXT) -> bytes:
 
 class ApiContractTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.workspace_temp_root = Path(__file__).resolve().parent / ".tmp"
+        self.workspace_temp_root = Path(__file__).resolve().parent / "_runtime"
         self.workspace_temp_root.mkdir(parents=True, exist_ok=True)
-        self.root_path = Path(tempfile.mkdtemp(dir=self.workspace_temp_root))
+        self.root_path = self.workspace_temp_root / f"studyiacopilot-tests-{uuid4().hex}"
+        self.root_path.mkdir(parents=True, exist_ok=False)
         self.upload_path = self.root_path / "uploads"
         self.data_path = self.root_path / "data"
         self.upload_path.mkdir(parents=True, exist_ok=True)
@@ -86,9 +87,18 @@ class ApiContractTests(unittest.TestCase):
         system_route.embedding_model = None
         system_route.reranker_model = None
         system_route.faiss_module = None
-        query_module.generate_answer = lambda question, context, history: (
-            "Mocked grounded answer."
-        )
+        self.llm_calls: list[dict] = []
+
+        def fake_generate_answer(question, context, history=None, **kwargs):
+            self.llm_calls.append({
+                "question": question,
+                "context": context,
+                "history": history or [],
+                "kwargs": kwargs,
+            })
+            return "Mocked grounded answer."
+
+        query_module.generate_answer = fake_generate_answer
         query_module.DOCUMENTS.clear()
 
         self.client = TestClient(build_test_app())
@@ -215,6 +225,70 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(payload["answer"], "Mocked grounded answer.")
         self.assertTrue(returned_doc_ids.issubset({first_upload["doc_id"], second_upload["doc_id"]}))
         self.assertEqual(returned_doc_ids, {first_upload["doc_id"], second_upload["doc_id"]})
+
+    def test_ask_groups_context_by_document_for_comparison_questions(self) -> None:
+        first_upload = self.upload_sample_pdf(
+            "greek-architecture.pdf",
+            text=("Greek architecture relies on columns, pediments, and geometric proportion. " * 8),
+        )
+        second_upload = self.upload_sample_pdf(
+            "islamic-architecture.pdf",
+            text=("Islamic architecture relies on courtyards, arches, and geometric ornament. " * 8),
+        )
+
+        ask_response = self.client.post(
+            "/api/ask",
+            json={
+                "question": "Compare the similarities and differences between the documents.",
+                "doc_ids": [first_upload["doc_id"], second_upload["doc_id"]],
+                "history": [],
+            },
+        )
+
+        self.assertEqual(ask_response.status_code, 200, ask_response.text)
+        payload = ask_response.json()
+        last_llm_call = self.llm_calls[-1]
+        returned_doc_ids = {source["doc_id"] for source in payload["sources"]}
+        returned_labels = {source.get("doc_label") for source in payload["sources"]}
+
+        self.assertEqual(payload["answer"], "Mocked grounded answer.")
+        self.assertEqual(last_llm_call["kwargs"].get("prompt_mode"), "comparison")
+        self.assertIn("[Greek Architecture]", last_llm_call["context"])
+        self.assertIn("[Islamic Architecture]", last_llm_call["context"])
+        self.assertIn("Excerpt 1", last_llm_call["context"])
+        self.assertEqual(returned_doc_ids, {first_upload["doc_id"], second_upload["doc_id"]})
+        self.assertIn("Greek Architecture", returned_labels)
+        self.assertIn("Islamic Architecture", returned_labels)
+
+    def test_ask_uses_cross_document_fallback_for_relational_questions(self) -> None:
+        first_upload = self.upload_sample_pdf(
+            "civic-order.pdf",
+            text=("Doric colonnades and stone pediments organize civic temples. " * 8),
+        )
+        second_upload = self.upload_sample_pdf(
+            "sacred-space.pdf",
+            text=("Muqarnas vaults and interior courtyards organize sacred complexes. " * 8),
+        )
+
+        ask_response = self.client.post(
+            "/api/ask",
+            json={
+                "question": "What is the relationship between the two documents?",
+                "doc_ids": [first_upload["doc_id"], second_upload["doc_id"]],
+                "history": [],
+            },
+        )
+
+        self.assertEqual(ask_response.status_code, 200, ask_response.text)
+        payload = ask_response.json()
+        last_llm_call = self.llm_calls[-1]
+        returned_doc_ids = {source["doc_id"] for source in payload["sources"]}
+
+        self.assertEqual(payload["answer"], "Mocked grounded answer.")
+        self.assertEqual(last_llm_call["kwargs"].get("prompt_mode"), "comparison")
+        self.assertEqual(returned_doc_ids, {first_upload["doc_id"], second_upload["doc_id"]})
+        self.assertIn("[Civic Order]", last_llm_call["context"])
+        self.assertIn("[Sacred Space]", last_llm_call["context"])
 
     def test_delete_document_removes_assets_and_catalog_entry(self) -> None:
         upload_payload = self.upload_sample_pdf("cleanup-proof.pdf")
