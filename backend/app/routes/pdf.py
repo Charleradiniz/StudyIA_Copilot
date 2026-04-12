@@ -15,6 +15,11 @@ def get_pdf(
 ):
     normalized_file_id = file_id.replace(".pdf", "").strip()
     loaded = load_document(normalized_file_id, current_user.id, load_index=False)
+    if not loaded:
+        raise HTTPException(
+            status_code=404,
+            detail=f"PDF not found: {normalized_file_id}",
+        )
     metadata = loaded.get("metadata", {}) if loaded else {}
     file_path = resolve_upload_path(normalized_file_id, current_user.id, metadata)
 

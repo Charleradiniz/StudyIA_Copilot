@@ -95,7 +95,7 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        question: "Why portfolio-ready?",
+        question: "Why is this workflow production-ready?",
         answer: "Grounded answer.",
         sources: [
           {
@@ -174,7 +174,7 @@ test("uploads a PDF and completes the grounded Q&A flow", async ({ page }) => {
 
   await page
     .getByRole("textbox", { name: "Message" })
-    .fill("Why portfolio-ready?");
+      .fill("Why is this workflow production-ready?");
   await page.getByRole("button", { name: "Send" }).click();
 
   await expect(page.getByText("Grounded answer.")).toBeVisible();

@@ -10,7 +10,7 @@ const baseProps = {
   chats: [
     {
       id: "chat-1",
-      title: "AI Portfolio Review",
+      title: "AI System Review",
       activeDocIds: ["doc-1"],
       messages: [
         {
@@ -73,7 +73,7 @@ describe("SidebarPanel", () => {
     expect(screen.getByRole("button", { name: "Clear all" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete Architecture Notes.pdf" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clear chats" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete chat AI Portfolio Review" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete chat AI System Review" })).toBeInTheDocument();
     expect(screen.getByText(/Charles Study/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Log out" })).toBeInTheDocument();
   });
@@ -85,7 +85,7 @@ describe("SidebarPanel", () => {
     expect(screen.queryByText("Chat history")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete Architecture Notes.pdf" })).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Delete chat AI Portfolio Review" }),
+      screen.queryByRole("button", { name: "Delete chat AI System Review" }),
     ).not.toBeInTheDocument();
   });
 
@@ -94,7 +94,7 @@ describe("SidebarPanel", () => {
 
     expect(screen.getByText("Chat history")).toBeInTheDocument();
     expect(screen.queryByText("Document library")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete chat AI Portfolio Review" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete chat AI System Review" })).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Delete Architecture Notes.pdf" }),
     ).not.toBeInTheDocument();

@@ -1,4 +1,5 @@
 from collections import defaultdict, deque
+from functools import lru_cache
 from pathlib import Path
 from time import perf_counter
 import logging
@@ -12,9 +13,10 @@ from pydantic import BaseModel
 from app.config import RAG_MODE
 from app.db.deps import get_current_user
 from app.models.user import User
+from app.services.context_reasoning import retrieve_chunks, run_context_aware_reasoning
 from app.services.embeddings import model
 from app.services.llm import generate_answer
-from app.services.reranker import rerank
+from app.services.reranker import rerank, reranker_model
 from app.services.similarity import search
 from app.services.storage import iter_saved_documents, load_document
 
@@ -80,6 +82,17 @@ RERANK_TOP_K = 12
 DEFAULT_SOURCE_COUNT = 5
 DEFAULT_CONTEXT_COUNT = 8
 NEIGHBOR_OFFSETS = (1, -1, 2, -2)
+TEXT_TOKEN_PATTERN = re.compile(r"\S+")
+ALPHA_CHAR_PATTERN = re.compile(r"[A-Za-zÀ-ÿ]")
+STRONG_SYMBOL_PATTERN = re.compile(r"[^A-Za-zÀ-ÿ0-9\s\.,;:?!()/%\-]")
+CODE_LIKE_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9&<>'|./:=+_-]{2,}$")
+MIN_USABLE_CONTEXT_QUALITY = 0.34
+SUMMARY_SAMPLE_K = 6
+LOW_QUALITY_ANSWER = (
+    "Não consegui responder com segurança porque o texto extraído deste PDF "
+    "parece estar muito ruidoso, corrompido ou pouco legível. "
+    "Tente uma versão com texto selecionável ou aplique OCR antes do upload."
+)
 
 
 class AskRequest(BaseModel):
@@ -192,6 +205,129 @@ def normalize_requested_doc_ids(data: AskRequest) -> list[str]:
             requested_doc_ids.append(normalized)
 
     return requested_doc_ids
+
+
+def build_chunk_result(chunk: dict, index: int, score: float = 0.0) -> dict:
+    return {
+        "id": index,
+        "text": (chunk.get("text") or "").strip(),
+        "doc_id": chunk.get("doc_id"),
+        "file_id": chunk.get("file_id"),
+        "score": score,
+        "chunk_id": chunk.get("id"),
+        "page": chunk.get("page"),
+        "bbox": chunk.get("bbox"),
+        "line_boxes": chunk.get("line_boxes", []),
+    }
+
+
+@lru_cache(maxsize=16384)
+def analyze_text_quality_cached(text: str) -> tuple[float, float, float, float, float, bool]:
+    normalized = (text or "").strip()
+    if not normalized:
+        return (0.0, 0.0, 0.0, 1.0, 1.0, True)
+
+    tokens = TEXT_TOKEN_PATTERN.findall(normalized)
+    total_chars = max(len(normalized), 1)
+    alpha_ratio = len(ALPHA_CHAR_PATTERN.findall(normalized)) / total_chars
+    strong_symbol_ratio = len(STRONG_SYMBOL_PATTERN.findall(normalized)) / total_chars
+
+    natural_tokens = []
+    code_like_tokens = []
+
+    for token in tokens:
+        letters_only = re.sub(r"[^A-Za-zÀ-ÿ]", "", token)
+        if len(letters_only) >= 3:
+            natural_tokens.append(token)
+
+        if not CODE_LIKE_TOKEN_PATTERN.fullmatch(token):
+            continue
+
+        if token.isdigit() or len(letters_only) >= 3:
+            continue
+
+        code_like_tokens.append(token)
+
+    token_count = max(len(tokens), 1)
+    natural_token_ratio = len(natural_tokens) / token_count
+    code_like_ratio = len(code_like_tokens) / token_count
+    alpha_component = min(alpha_ratio / 0.55, 1.0)
+    symbol_component = max(0.0, 1.0 - min(strong_symbol_ratio / 0.12, 1.0))
+    code_component = max(0.0, 1.0 - min(code_like_ratio / 0.45, 1.0))
+    quality_score = round(
+        (alpha_component * 0.4)
+        + (natural_token_ratio * 0.4)
+        + (symbol_component * 0.1)
+        + (code_component * 0.1),
+        4,
+    )
+    is_low_quality = (
+        len(normalized) >= 60
+        and quality_score < MIN_USABLE_CONTEXT_QUALITY
+        and (
+            natural_token_ratio < 0.33
+            or code_like_ratio > 0.35
+            or alpha_ratio < 0.42
+        )
+    )
+
+    return (
+        quality_score,
+        alpha_ratio,
+        natural_token_ratio,
+        code_like_ratio,
+        strong_symbol_ratio,
+        is_low_quality,
+    )
+
+
+def analyze_text_quality(text: str) -> dict:
+    (
+        quality_score,
+        alpha_ratio,
+        natural_token_ratio,
+        code_like_ratio,
+        strong_symbol_ratio,
+        is_low_quality,
+    ) = analyze_text_quality_cached((text or "").strip())
+
+    return {
+        "quality_score": quality_score,
+        "alpha_ratio": alpha_ratio,
+        "natural_token_ratio": natural_token_ratio,
+        "code_like_ratio": code_like_ratio,
+        "strong_symbol_ratio": strong_symbol_ratio,
+        "is_low_quality": is_low_quality,
+    }
+
+
+def is_low_quality_chunk(chunk: dict) -> bool:
+    return analyze_text_quality(chunk.get("text") or "").get("is_low_quality", True)
+
+
+def build_chunk_quality_map(chunks: list[dict]) -> dict[tuple, dict]:
+    quality_map = {}
+    for chunk in chunks:
+        quality_map[chunk_signature(chunk)] = analyze_text_quality(chunk.get("text") or "")
+    return quality_map
+
+
+def prefer_usable_chunks(chunks: list[dict]) -> list[dict]:
+    quality_map = build_chunk_quality_map(chunks)
+    usable_chunks = [
+        chunk
+        for chunk in chunks
+        if not quality_map.get(chunk_signature(chunk), {}).get("is_low_quality", True)
+    ]
+    return usable_chunks or chunks
+
+
+def build_low_quality_response(question: str) -> dict:
+    return {
+        "question": question,
+        "answer": LOW_QUALITY_ANSWER,
+        "sources": [],
+    }
 
 
 def get_document_name(doc: dict) -> str:
@@ -510,18 +646,7 @@ def lexical_search(documents: list[dict], query: str, k: int = 6):
         coverage = len(overlap) / max(len(query_tokens), 1)
         density = len(overlap) / max(len(text_tokens), 1)
         score = round((coverage * 0.8) + (density * 0.2), 4)
-
-        scored.append({
-            "id": index,
-            "text": text,
-            "doc_id": chunk.get("doc_id"),
-            "file_id": chunk.get("file_id"),
-            "score": score,
-            "chunk_id": chunk.get("id"),
-            "page": chunk.get("page"),
-            "bbox": chunk.get("bbox"),
-            "line_boxes": chunk.get("line_boxes", []),
-        })
+        scored.append(build_chunk_result(chunk, index, score=score))
 
     scored.sort(key=lambda item: item["score"], reverse=True)
     return scored[:k]
@@ -535,17 +660,7 @@ def first_chunks(documents, k=5):
         if not text:
             continue
 
-        selected.append({
-            "id": index,
-            "text": text,
-            "doc_id": chunk.get("doc_id"),
-            "file_id": chunk.get("file_id"),
-            "score": 0.0,
-            "chunk_id": chunk.get("id"),
-            "page": chunk.get("page"),
-            "bbox": chunk.get("bbox"),
-            "line_boxes": chunk.get("line_boxes", []),
-        })
+        selected.append(build_chunk_result(chunk, index))
 
         if len(selected) >= k:
             break
@@ -555,6 +670,106 @@ def first_chunks(documents, k=5):
 
 def all_chunks(documents, k=8):
     return first_chunks(documents, k=k)
+
+
+def get_representative_chunk_cache(doc: dict) -> dict:
+    metadata = doc.setdefault("_derived", {})
+    cache = metadata.setdefault("representative_chunks", {})
+    return cache
+
+
+def representative_chunks(documents: list[dict], k: int = SUMMARY_SAMPLE_K) -> list[dict]:
+    prepared_chunks = []
+
+    for index, chunk in enumerate(documents):
+        text = (chunk.get("text") or "").strip()
+        if not text:
+            continue
+
+        quality = analyze_text_quality(text)
+        length_bonus = min(len(text) / 700, 1.0) * 0.12
+        sentence_bonus = 0.08 if any(marker in text for marker in ".!?") else 0.0
+        summary_score = round(
+            quality["quality_score"]
+            + length_bonus
+            + sentence_bonus
+            - min(quality["code_like_ratio"], 0.6) * 0.25,
+            4,
+        )
+        prepared_chunk = build_chunk_result(chunk, index)
+        prepared_chunk["_position"] = index
+        prepared_chunk["_quality_score"] = quality["quality_score"]
+        prepared_chunk["_summary_score"] = summary_score
+        prepared_chunks.append(prepared_chunk)
+
+    if not prepared_chunks:
+        return []
+
+    readable_chunks = [
+        chunk
+        for chunk in prepared_chunks
+        if chunk["_quality_score"] >= MIN_USABLE_CONTEXT_QUALITY
+    ]
+    pool = readable_chunks or prepared_chunks
+
+    if len(pool) <= k:
+        selected_chunks = pool
+    else:
+        selected_chunks = []
+        used_signatures = set()
+        for step in range(k):
+            target_index = round(step * (len(pool) - 1) / max(k - 1, 1))
+            window_start = max(0, target_index - 2)
+            window_end = min(len(pool), target_index + 3)
+            window = [
+                chunk
+                for chunk in pool[window_start:window_end]
+                if chunk_signature(chunk) not in used_signatures
+            ]
+            if not window:
+                continue
+
+            target_position = pool[target_index]["_position"]
+            chosen_chunk = max(
+                window,
+                key=lambda chunk: (
+                    chunk["_summary_score"],
+                    -abs(chunk["_position"] - target_position),
+                ),
+            )
+            used_signatures.add(chunk_signature(chosen_chunk))
+            selected_chunks.append(chosen_chunk)
+
+        if len(selected_chunks) < k:
+            for chunk in sorted(
+                pool,
+                key=lambda item: (item["_summary_score"], item["_quality_score"]),
+                reverse=True,
+            ):
+                if chunk_signature(chunk) in used_signatures:
+                    continue
+                used_signatures.add(chunk_signature(chunk))
+                selected_chunks.append(chunk)
+                if len(selected_chunks) >= k:
+                    break
+
+    selected_chunks.sort(key=lambda chunk: chunk["_position"])
+    return [
+        {
+            key: value
+            for key, value in chunk.items()
+            if not key.startswith("_")
+        }
+        for chunk in selected_chunks
+    ]
+
+
+def get_representative_chunks(doc: dict, k: int = SUMMARY_SAMPLE_K) -> list[dict]:
+    cache = get_representative_chunk_cache(doc)
+    cache_key = str(k)
+    if cache_key not in cache:
+        cache[cache_key] = representative_chunks(doc.get("documents", []), k=k)
+    return list(cache[cache_key])
 
 
 def merge_unique_results(*collections: list[dict], limit: int | None = None) -> list[dict]:
@@ -601,8 +816,15 @@ def gather_results_for_doc(
         limit=PER_DOC_RESULT_LIMIT,
     )
 
+    if is_summary_query(question):
+        doc_results = merge_unique_results(
+            doc_results,
+            get_representative_chunks(doc, k=min(4, SUMMARY_SAMPLE_K)),
+            limit=PER_DOC_RESULT_LIMIT,
+        )
+
     if not doc_results and is_summary_query(question):
-        doc_results = all_chunks(documents, k=6 if RAG_MODE != "full" else 5)
+        doc_results = get_representative_chunks(doc, k=SUMMARY_SAMPLE_K)
 
     if not doc_results and prompt_mode == "comparison":
         doc_results = first_chunks(documents, k=2)
@@ -745,7 +967,16 @@ async def ask_question(
         effective_question = build_effective_query(question, data.history)
 
         retrieval_started_at = perf_counter()
-        all_results = gather_results(docs, question, effective_question, prompt_mode)
+        retrieval_bundle = retrieve_chunks(
+            question,
+            docs,
+            effective_question=effective_question,
+            prompt_mode=prompt_mode,
+            retriever=gather_results,
+            limit=MERGED_RESULT_LIMIT,
+        )
+        all_results = retrieval_bundle["all_results"]
+        candidate_chunks = retrieval_bundle["candidate_chunks"]
         retrieval_ms = round((perf_counter() - retrieval_started_at) * 1000, 2)
 
         if not all_results:
@@ -764,19 +995,32 @@ async def ask_question(
                 "sources": [],
             }
 
-        candidate_chunks = [chunk for chunk in all_results[:MERGED_RESULT_LIMIT] if chunk.get("text")]
+        usable_candidate_chunks = [chunk for chunk in candidate_chunks if not is_low_quality_chunk(chunk)]
+        if usable_candidate_chunks:
+            candidate_chunks = usable_candidate_chunks
+        elif candidate_chunks:
+            logger.info(
+                "ask_low_quality_context doc_ids=%s prompt_mode=%s question=%r effective_question=%r history_turns=%s",
+                requested_doc_ids or None,
+                prompt_mode,
+                question[:200],
+                effective_question[:300],
+                len(data.history or []),
+            )
+            return build_low_quality_response(question)
+
         rerank_started_at = perf_counter()
         reranked_chunks = (
             rerank(effective_question, candidate_chunks, top_k=RERANK_TOP_K)
             if candidate_chunks and RAG_MODE == "full"
             else candidate_chunks[:RERANK_TOP_K]
         )
-        fallback_chunks = build_fallback_results(docs, prompt_mode)
-        neighbor_chunks = build_neighbor_results(
+        fallback_chunks = prefer_usable_chunks(build_fallback_results(docs, prompt_mode))
+        neighbor_chunks = prefer_usable_chunks(build_neighbor_results(
             docs,
             reranked_chunks or candidate_chunks,
             limit=max(DEFAULT_CONTEXT_COUNT, DEFAULT_SOURCE_COUNT),
-        )
+        ))
         available_chunk_count = len(
             merge_unique_results(
                 candidate_chunks,
@@ -808,9 +1052,81 @@ async def ask_question(
         source_chunks = ensure_source_count(source_chunks, fallback_chunks, desired_source_count)
         rerank_ms = round((perf_counter() - rerank_started_at) * 1000, 2)
 
+        usable_context_chunks = [chunk for chunk in context_chunks if not is_low_quality_chunk(chunk)]
+        if not usable_context_chunks:
+            logger.info(
+                "ask_low_quality_final_context doc_ids=%s prompt_mode=%s question=%r effective_question=%r history_turns=%s",
+                requested_doc_ids or None,
+                prompt_mode,
+                question[:200],
+                effective_question[:300],
+                len(data.history or []),
+            )
+            return build_low_quality_response(question)
+
+        context_chunks = usable_context_chunks[:desired_context_count]
+        usable_source_chunks = [chunk for chunk in source_chunks if not is_low_quality_chunk(chunk)]
+        source_chunks = usable_source_chunks[:desired_source_count] or context_chunks[:desired_source_count]
+
+        reasoning_pool = merge_unique_results(
+            reranked_chunks,
+            candidate_chunks,
+            neighbor_chunks,
+            fallback_chunks,
+            limit=max(desired_context_count + desired_source_count + 4, 14),
+        )
+        reasoning_started_at = perf_counter()
+        reasoning_result = run_context_aware_reasoning(
+            question,
+            reasoning_pool,
+            semantic_model=model if RAG_MODE == "full" else None,
+            cross_encoder=(
+                reranker_model
+                if RAG_MODE == "full" and reranker_model is not None and len(reasoning_pool) <= 14
+                else None
+            ),
+            desired_source_count=desired_source_count,
+            desired_context_count=desired_context_count,
+            max_reasoning_chunks=max(desired_context_count + desired_source_count + 2, 12),
+        )
+        reasoning_ms = round((perf_counter() - reasoning_started_at) * 1000, 2)
+
+        reasoned_context_chunks = reasoning_result.get("context_chunks") or []
+        reasoned_source_chunks = reasoning_result.get("source_chunks") or []
+        structured_context = (reasoning_result.get("structured_context") or "").strip()
+        context_metrics = reasoning_result.get("metrics") or {}
+        baseline_context_chunks = list(context_chunks)
+        baseline_source_chunks = list(source_chunks)
+
+        if reasoned_context_chunks:
+            context_chunks = apply_document_diversity(
+                reasoned_context_chunks,
+                top_k=max(desired_context_count, 1),
+            )
+            context_chunks = ensure_source_count(
+                context_chunks,
+                baseline_context_chunks,
+                desired_context_count,
+            )
+        if reasoned_source_chunks:
+            source_chunks = apply_document_diversity(
+                reasoned_source_chunks,
+                top_k=max(desired_source_count, 1),
+            )
+            source_chunks = ensure_source_count(
+                source_chunks,
+                baseline_source_chunks,
+                desired_source_count,
+            )
+            source_chunks = ensure_source_count(
+                source_chunks,
+                context_chunks,
+                desired_source_count,
+            )
+
         if not context_chunks or not source_chunks:
             logger.info(
-                "ask_no_top_chunks doc_ids=%s prompt_mode=%s question=%r effective_question=%r history_turns=%s retrieval_ms=%s rerank_ms=%s",
+                "ask_no_top_chunks doc_ids=%s prompt_mode=%s question=%r effective_question=%r history_turns=%s retrieval_ms=%s rerank_ms=%s reasoning_ms=%s",
                 requested_doc_ids or None,
                 prompt_mode,
                 question[:200],
@@ -818,6 +1134,7 @@ async def ask_question(
                 len(data.history or []),
                 retrieval_ms,
                 rerank_ms,
+                reasoning_ms,
             )
             return {
                 "question": question,
@@ -825,7 +1142,7 @@ async def ask_question(
                 "sources": [],
             }
 
-        context = build_context(context_chunks)
+        context = structured_context or build_context(context_chunks)
         llm_started_at = perf_counter()
         answer = generate_answer(
             question,
@@ -837,7 +1154,7 @@ async def ask_question(
         total_ms = round((perf_counter() - request_started_at) * 1000, 2)
 
         logger.info(
-            "ask_completed doc_ids=%s rag_mode=%s prompt_mode=%s question=%r effective_question=%r history_turns=%s retrieval_results=%s selected_chunks=%s retrieval_ms=%s rerank_ms=%s llm_ms=%s total_ms=%s",
+            "ask_completed doc_ids=%s rag_mode=%s prompt_mode=%s question=%r effective_question=%r history_turns=%s retrieval_results=%s selected_chunks=%s retrieval_ms=%s rerank_ms=%s reasoning_ms=%s llm_ms=%s total_ms=%s context_metrics=%s",
             requested_doc_ids or None,
             RAG_MODE,
             prompt_mode,
@@ -848,8 +1165,10 @@ async def ask_question(
             len(source_chunks),
             retrieval_ms,
             rerank_ms,
+            reasoning_ms,
             llm_ms,
             total_ms,
+            context_metrics,
         )
 
         return {

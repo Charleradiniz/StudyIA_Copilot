@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.config import DATABASE_URL
 
@@ -28,6 +29,8 @@ def configure_database(database_url: str | None = None) -> Engine | None:
         if target_url.startswith("sqlite")
         else {}
     )
+    if target_url in {"sqlite://", "sqlite:///:memory:"}:
+        engine_kwargs["poolclass"] = StaticPool
     engine = create_engine(target_url, **engine_kwargs)
     SessionLocal = sessionmaker(
         autocommit=False,

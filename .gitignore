@@ -15,11 +15,14 @@ backend/.env
 frontend/.env
 
 # Local runtime data
-backend/data/*.json
+backend/data/
 backend/uploads/
 backend/*.db
 studycopilot.db
 uploads/
+backend/_runtime_probe/
+backend/tests/_runtime*/
+backend/tests/_rename_probe.txt
 
 # OS / editor
 .DS_Store

@@ -175,7 +175,7 @@ The backend now logs the most useful steps of the RAG pipeline:
 - number of selected chunks
 - document id and effective query
 
-These logs make the project easier to debug and easier to discuss in interviews, because you can explain not only what the system does, but how you inspect retrieval quality and latency.
+These logs make the project easier to debug and easier to operate, because you can explain not only what the system does, but how you inspect retrieval quality and latency.
 
 ## Frontend Product Improvements
 
@@ -190,9 +190,9 @@ The current UI includes:
 
 This makes the app feel closer to a production SaaS experience rather than a single-screen prototype.
 
-## Suggested Demo Flow
+## Suggested Walkthrough
 
-If you are presenting this project in an interview:
+If you are reviewing the product end to end:
 
 1. Upload a PDF with real text.
 2. Ask for a summary.
@@ -210,7 +210,7 @@ That flow demonstrates:
 - fullstack UX integration
 - operational visibility
 
-## Engineering Decisions Worth Mentioning In Interviews
+## Engineering Decisions Worth Calling Out
 
 - The app separates a stronger local `full` mode from a cheaper public `lite` mode instead of deleting the advanced pipeline for deployment convenience.
 - PDF chunks keep positional metadata, which enables evidence highlighting instead of only plain-text citations.
@@ -218,9 +218,9 @@ That flow demonstrates:
 - The frontend persists sessions locally, which makes the product feel continuous across refreshes.
 - Logs capture retrieval and generation timing, which is useful for latency analysis and debugging retrieval quality.
 - The backend exposes document catalog and runtime readiness endpoints so the UI can surface operational state instead of hiding infrastructure assumptions.
-- The repository includes API contract tests for the core user flow, which makes the project stronger in technical interviews and safer to evolve.
+- The repository includes API contract tests for the core user flow, which makes the project safer to evolve and easier to validate with confidence.
 
-## Portfolio Signals
+## Technical Strengths
 
 What makes this repository stronger than a typical AI demo:
 - the product explains where answers came from instead of only generating text
@@ -231,7 +231,7 @@ What makes this repository stronger than a typical AI demo:
 
 ## Current Gaps
 
-The project is already strong for a portfolio, but the next steps that would raise employability even more are:
+The project already has a strong foundation, but the next steps that would raise it to a much higher level are:
 - frontend component or e2e tests
 - structured evaluation for retrieval quality
 - session persistence in a real database
@@ -264,9 +264,9 @@ DATABASE_URL=your_database_url
 VITE_API_URL=https://your-render-service.onrender.com
 ```
 
-## Why This Project Is Good For A Fullstack AI Portfolio
+## Why This Project Has Strong Technical Potential
 
-This project shows a combination that recruiters and interviewers often look for:
+This project combines qualities that matter in stronger AI products:
 - product thinking
 - applied AI engineering
 - retrieval grounding

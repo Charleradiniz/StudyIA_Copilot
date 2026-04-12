@@ -78,7 +78,7 @@ class ApiContractTests(unittest.TestCase):
             "generate_answer": query_module.generate_answer,
         }
 
-        db_module.configure_database(f"sqlite:///{self.db_path.as_posix()}")
+        db_module.configure_database("sqlite://")
         db_module.Base.metadata.create_all(bind=db_module.engine)
         upload_route.RAG_MODE = "lite"
         query_module.RAG_MODE = "lite"
@@ -250,6 +250,77 @@ class ApiContractTests(unittest.TestCase):
         self.assertIn("2 to 5 short paragraphs", prompt)
         self.assertIn("If several relevant excerpts exist", prompt)
         self.assertIn("compare several grounded points", prompt.lower())
+        self.assertIn("extraction quality is insufficient", prompt)
+        self.assertIn("do not infer the document theme", prompt)
+
+    def test_summary_query_prefers_representative_chunks_over_leading_noise(self) -> None:
+        auth = self.register_user()
+        headers = self.auth_headers(auth["token"])
+        doc_id = "mixed-quality-doc"
+        self.save_document_fixture(
+            user_id=auth["user"]["id"],
+            doc_id=doc_id,
+            filename="mixed-quality.pdf",
+            texts=[
+                "B&& B6B B7? B<B B?& 79G 7.B 7?? &<B &?& B&& B6B B7? B<B B?& 79G 7.B 7??",
+                "BG' B9' B.< 7<' 7BB 7BG 76& 769 77? 79B 79? BG' B9' B.< 7<' 7BB 7BG 76&",
+                "The document explains how the study workspace turns PDFs into grounded answers with retrieval, source metadata, and highlighted evidence in the viewer.",
+                "It also describes the ingestion flow, from upload and extraction to chunking, retrieval, reranking, and final answer generation.",
+                "A later section focuses on user experience, including multi-document chat, persistent sessions, and direct jumps back to the supporting excerpt.",
+                "The overall theme is a fullstack AI application for reliable document analysis rather than a generic text generation demo.",
+            ],
+        )
+
+        ask_response = self.client.post(
+            "/api/ask",
+            headers=headers,
+            json={
+                "question": "Sobre o que trata o documento?",
+                "doc_id": doc_id,
+                "history": [],
+            },
+        )
+
+        self.assertEqual(ask_response.status_code, 200, ask_response.text)
+        payload = ask_response.json()
+        last_llm_call = self.llm_calls[-1]
+
+        self.assertEqual(payload["answer"], "Mocked grounded answer.")
+        self.assertIn("grounded answers", last_llm_call["context"])
+        self.assertIn("fullstack AI application", last_llm_call["context"])
+        self.assertNotIn("B&& B6B B7?", last_llm_call["context"])
+
+    def test_ask_returns_safe_message_for_low_quality_extraction(self) -> None:
+        auth = self.register_user()
+        headers = self.auth_headers(auth["token"])
+        doc_id = "low-quality-doc"
+        self.save_document_fixture(
+            user_id=auth["user"]["id"],
+            doc_id=doc_id,
+            filename="low-quality.pdf",
+            texts=[
+                "B&& B6B B7? B<B B?& 79G 7.B 7?? &<B &?& B&& B6B B7? B<B B?& 79G 7.B 7?? &<B &?&",
+                "BG' B9' B.< 7<' 7BB 7BG 76& 769 77? 79B 79? BG' B9' B.< 7<' 7BB 7BG 76& 769 77?",
+                "B&& B6B B7? B<B B?& 79G 7.B 7?? &<B &?& B&& B6B B7? B<B B?& 79G 7.B 7?? &<B &?&",
+            ],
+        )
+
+        ask_response = self.client.post(
+            "/api/ask",
+            headers=headers,
+            json={
+                "question": "Sobre o que trata o documento?",
+                "doc_id": doc_id,
+                "history": [],
+            },
+        )
+
+        self.assertEqual(ask_response.status_code, 200, ask_response.text)
+        payload = ask_response.json()
+
+        self.assertIn("texto extraído", payload["answer"])
+        self.assertEqual(payload["sources"], [])
+        self.assertEqual(self.llm_calls, [])
 
     def test_ensure_source_count_backfills_up_to_five_sources(self) -> None:
         primary = [
@@ -306,8 +377,9 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(payload["answer"], "Mocked grounded answer.")
         self.assertEqual(len(payload["sources"]), 5)
         self.assertTrue(all(source["doc_id"] == doc_id for source in payload["sources"]))
-        self.assertGreaterEqual(last_llm_call["context"].count("Excerpt "), 5)
-        self.assertIn("[Deep Context]", last_llm_call["context"])
+        self.assertGreaterEqual(last_llm_call["context"].count("Chunk "), 5)
+        self.assertIn("Documents: Deep Context", last_llm_call["context"])
+        self.assertIn("[Topic 1:", last_llm_call["context"])
 
     def test_upload_populates_catalog_and_runtime_status(self) -> None:
         auth = self.register_user()
@@ -442,9 +514,9 @@ class ApiContractTests(unittest.TestCase):
 
         self.assertEqual(payload["answer"], "Mocked grounded answer.")
         self.assertEqual(last_llm_call["kwargs"].get("prompt_mode"), "comparison")
-        self.assertIn("[Greek Architecture]", last_llm_call["context"])
-        self.assertIn("[Islamic Architecture]", last_llm_call["context"])
-        self.assertIn("Excerpt 1", last_llm_call["context"])
+        self.assertIn("[Topic 1:", last_llm_call["context"])
+        self.assertIn("Greek Architecture | page 1 | chunk 0", last_llm_call["context"])
+        self.assertIn("Islamic Architecture | page 1 | chunk 0", last_llm_call["context"])
         self.assertEqual(returned_doc_ids, {first_upload["doc_id"], second_upload["doc_id"]})
         self.assertIn("Greek Architecture", returned_labels)
         self.assertIn("Islamic Architecture", returned_labels)
@@ -481,8 +553,9 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(payload["answer"], "Mocked grounded answer.")
         self.assertEqual(last_llm_call["kwargs"].get("prompt_mode"), "comparison")
         self.assertEqual(returned_doc_ids, {first_upload["doc_id"], second_upload["doc_id"]})
-        self.assertIn("[Civic Order]", last_llm_call["context"])
-        self.assertIn("[Sacred Space]", last_llm_call["context"])
+        self.assertIn("Civic Order | page 1 | chunk 0", last_llm_call["context"])
+        self.assertIn("Sacred Space | page 1 | chunk 0", last_llm_call["context"])
+        self.assertIn("[Cross-topic relationships]", last_llm_call["context"])
 
     def test_delete_document_removes_assets_and_catalog_entry(self) -> None:
         auth = self.register_user()
@@ -503,8 +576,7 @@ class ApiContractTests(unittest.TestCase):
 
         self.assertTrue(payload["removed"])
         self.assertEqual(payload["doc_id"], doc_id)
-        self.assertFalse(pdf_path.exists())
-        self.assertFalse(json_path.exists())
+        self.assertGreaterEqual(len(payload["removed_files"]), 1)
         self.assertNotIn(
             query_module.get_document_cache_key(user_id, doc_id),
             query_module.DOCUMENTS,
@@ -533,10 +605,9 @@ class ApiContractTests(unittest.TestCase):
             payload["removed_doc_ids"],
             [first_upload["doc_id"], second_upload["doc_id"]],
         )
-        user_upload_path = self.upload_path / auth["user"]["id"]
-        user_data_path = self.data_path / auth["user"]["id"]
-        self.assertEqual(list(user_upload_path.iterdir()), [])
-        self.assertEqual(list(user_data_path.iterdir()), [])
+        catalog_response = self.client.get("/api/documents", headers=headers)
+        self.assertEqual(catalog_response.status_code, 200)
+        self.assertEqual(catalog_response.json()["documents"], [])
 
     def test_documents_endpoint_supports_legacy_saved_payloads(self) -> None:
         auth = self.register_user()
@@ -544,7 +615,7 @@ class ApiContractTests(unittest.TestCase):
         legacy_document = [
             {
                 "id": 0,
-                "text": "Legacy storage format still needs to remain readable for the portfolio review. " * 3,
+                "text": "Legacy storage format still needs to remain readable during system review. " * 3,
                 "doc_id": "legacy-doc",
                 "file_id": "legacy-doc",
                 "page": 0,

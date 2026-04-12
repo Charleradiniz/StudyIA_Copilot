@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 
 from app.config import DATA_DIR, UPLOAD_DIR
@@ -133,11 +134,49 @@ def load_document(doc_id: str, user_id: str, *, load_index: bool = True):
             "metadata": {},
         }
 
+    if (data.get("metadata") or {}).get("deleted"):
+        return None
+
     return {
         "documents": data.get("documents", []),
         "index": index,
         "metadata": data.get("metadata", {}),
     }
+
+
+def unlink_with_retry(target_path: Path, attempts: int = 3, delay_seconds: float = 0.05) -> bool:
+    if not target_path.exists():
+        return False
+
+    for attempt in range(attempts):
+        try:
+            target_path.chmod(0o666)
+        except OSError:
+            pass
+
+        try:
+            target_path.unlink()
+            return True
+        except FileNotFoundError:
+            return False
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(delay_seconds * (attempt + 1))
+
+    return False
+
+
+def write_deleted_placeholder(target_path: Path, doc_id: str) -> None:
+    payload = {
+        "documents": [],
+        "metadata": {
+            "deleted": True,
+            "doc_id": doc_id,
+        },
+    }
+    with target_path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
 
 
 def delete_saved_document(doc_id: str, user_id: str):
@@ -157,14 +196,22 @@ def delete_saved_document(doc_id: str, user_id: str):
     for candidate in candidate_ids:
         faiss_path, json_path = get_paths(candidate, user_id)
         for target_path in (faiss_path, json_path):
-            if target_path.exists():
-                target_path.unlink()
-                removed_files.append(str(target_path))
+            try:
+                if unlink_with_retry(target_path):
+                    removed_files.append(str(target_path))
+            except PermissionError:
+                if target_path == json_path:
+                    write_deleted_placeholder(target_path, saved_doc_id)
+                    removed_files.append(f"{target_path} (logical delete)")
 
     for upload_path in iter_upload_paths(saved_doc_id, user_id, metadata):
-        if upload_path.exists() and upload_path.is_file():
-            upload_path.unlink()
-            removed_files.append(str(upload_path))
+        if not upload_path.is_file():
+            continue
+        try:
+            if unlink_with_retry(upload_path):
+                removed_files.append(str(upload_path))
+        except PermissionError:
+            removed_files.append(f"{upload_path} (pending cleanup)")
 
     return {
         "doc_id": saved_doc_id,
