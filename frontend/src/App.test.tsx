@@ -53,6 +53,24 @@ function jsonResponse(data: unknown, init?: ResponseInit) {
   });
 }
 
+function handleDefaultChatRequests(url: string, method: string) {
+  if (url.endsWith("/api/chats") && method === "GET") {
+    return jsonResponse({
+      chats: [],
+      deleted: [],
+    });
+  }
+
+  if (url.endsWith("/api/chats/sync") && method === "POST") {
+    return jsonResponse({
+      synced_chat_ids: [],
+      skipped_chat_ids: [],
+    });
+  }
+
+  return null;
+}
+
 function createSystemStatus(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     status: "ok",
@@ -148,26 +166,39 @@ describe("App", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        const method = init?.method ?? "GET";
 
-        if (url.endsWith("/api/auth/me")) {
+        if (url.endsWith("/api/auth/me") && method === "GET") {
           return jsonResponse({
             user: createUser(),
           });
         }
 
-        if (url.endsWith("/api/documents")) {
+        if (url.endsWith("/api/documents") && method === "GET") {
           return jsonResponse({
             documents: [createDocument()],
           });
         }
 
-        if (url.endsWith("/api/system/status")) {
+        if (url.endsWith("/api/system/status") && method === "GET") {
           return jsonResponse(createSystemStatus());
         }
 
-        throw new Error(`Unhandled request: ${url}`);
+        if (url.endsWith("/api/chats/chat-seeded") && method === "DELETE") {
+          return jsonResponse({
+            chat_id: "chat-seeded",
+            deleted: true,
+          });
+        }
+
+        const chatResponse = handleDefaultChatRequests(url, method);
+        if (chatResponse) {
+          return chatResponse;
+        }
+
+        throw new Error(`Unhandled request: ${method} ${url}`);
       }),
     );
 
@@ -185,26 +216,39 @@ describe("App", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        const method = init?.method ?? "GET";
 
-        if (url.endsWith("/api/auth/me")) {
+        if (url.endsWith("/api/auth/me") && method === "GET") {
           return jsonResponse({
             user: createUser(),
           });
         }
 
-        if (url.endsWith("/api/documents")) {
+        if (url.endsWith("/api/documents") && method === "GET") {
           return jsonResponse({
             documents: [createDocument()],
           });
         }
 
-        if (url.endsWith("/api/system/status")) {
+        if (url.endsWith("/api/system/status") && method === "GET") {
           return jsonResponse(createSystemStatus());
         }
 
-        throw new Error(`Unhandled request: ${url}`);
+        if (url.endsWith("/api/chats/chat-seeded") && method === "DELETE") {
+          return jsonResponse({
+            chat_id: "chat-seeded",
+            deleted: true,
+          });
+        }
+
+        const chatResponse = handleDefaultChatRequests(url, method);
+        if (chatResponse) {
+          return chatResponse;
+        }
+
+        throw new Error(`Unhandled request: ${method} ${url}`);
       }),
     );
 
@@ -280,6 +324,11 @@ describe("App", () => {
             },
           ],
         });
+      }
+
+      const chatResponse = handleDefaultChatRequests(url, method);
+      if (chatResponse) {
+        return chatResponse;
       }
 
       throw new Error(`Unhandled request: ${method} ${url}`);
@@ -393,6 +442,11 @@ describe("App", () => {
         });
       }
 
+      const chatResponse = handleDefaultChatRequests(url, method);
+      if (chatResponse) {
+        return chatResponse;
+      }
+
       throw new Error(`Unhandled request: ${method} ${url}`);
     });
 
@@ -467,6 +521,11 @@ describe("App", () => {
         });
       }
 
+      const chatResponse = handleDefaultChatRequests(url, method);
+      if (chatResponse) {
+        return chatResponse;
+      }
+
       throw new Error(`Unhandled request: ${method} ${url}`);
     });
 
@@ -497,26 +556,39 @@ describe("App", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        const method = init?.method ?? "GET";
 
-        if (url.endsWith("/api/auth/me")) {
+        if (url.endsWith("/api/auth/me") && method === "GET") {
           return jsonResponse({
             user: createUser(),
           });
         }
 
-        if (url.endsWith("/api/documents")) {
+        if (url.endsWith("/api/documents") && method === "GET") {
           return jsonResponse({
             documents: [createDocument()],
           });
         }
 
-        if (url.endsWith("/api/system/status")) {
+        if (url.endsWith("/api/system/status") && method === "GET") {
           return jsonResponse(createSystemStatus());
         }
 
-        throw new Error(`Unhandled request: ${url}`);
+        if (url.endsWith("/api/chats/chat-seeded") && method === "DELETE") {
+          return jsonResponse({
+            chat_id: "chat-seeded",
+            deleted: true,
+          });
+        }
+
+        const chatResponse = handleDefaultChatRequests(url, method);
+        if (chatResponse) {
+          return chatResponse;
+        }
+
+        throw new Error(`Unhandled request: ${method} ${url}`);
       }),
     );
 
@@ -564,6 +636,11 @@ describe("App", () => {
         return jsonResponse(createSystemStatus());
       }
 
+      const chatResponse = handleDefaultChatRequests(url, method);
+      if (chatResponse) {
+        return chatResponse;
+      }
+
       throw new Error(`Unhandled request: ${method} ${url}`);
     });
 
@@ -595,6 +672,11 @@ describe("App", () => {
           sent: true,
           message: "Recovery link sent.",
         });
+      }
+
+      const chatResponse = handleDefaultChatRequests(url, method);
+      if (chatResponse) {
+        return chatResponse;
       }
 
       throw new Error(`Unhandled request: ${method} ${url}`);
@@ -630,6 +712,11 @@ describe("App", () => {
           password_reset: true,
           message: "Password updated. You can sign in now.",
         });
+      }
+
+      const chatResponse = handleDefaultChatRequests(url, method);
+      if (chatResponse) {
+        return chatResponse;
       }
 
       throw new Error(`Unhandled request: ${method} ${url}`);

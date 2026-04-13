@@ -6,8 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import CORS_ORIGINS, UPLOAD_DIR
 from app.db.database import Base, engine
-from app.models import auth_session, document, password_reset_token, user
+from app.models import auth_session, chat_session, document, password_reset_token, user
 from app.routes.auth import router as auth_router
+from app.routes.chats import router as chats_router
 from app.routes.pdf import router as pdf_router
 from app.routes.system import router as system_router
 from app.routes.upload import router as upload_router
@@ -49,6 +50,7 @@ def root():
 
 
 app.include_router(auth_router, prefix="/api")
+app.include_router(chats_router, prefix="/api")
 app.include_router(upload_router, prefix="/api")
 app.include_router(query_router, prefix="/api")
 app.include_router(pdf_router, prefix="/api")

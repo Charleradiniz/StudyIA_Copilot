@@ -20,20 +20,26 @@ import {
   API_URL,
   ApiError,
   askQuestion,
+  clearChatHistory,
   clearDocuments,
   confirmPasswordReset,
+  deleteChatHistory,
   deleteDocument,
   getCurrentUser,
   getSystemStatus,
+  listChats,
   loginUser,
   listDocuments,
   logoutUser,
   requestPasswordReset,
   registerUser,
   setAuthToken,
+  syncChats,
   uploadPdf,
   type ApiUserResponse,
   type AuthResponse,
+  type ChatResponse,
+  type DeletedChatResponse,
   type DocumentSummaryResponse,
   type SystemStatusResponse,
 } from "./services/api";
@@ -47,6 +53,11 @@ type PersistedWorkspace = {
   activeChatId: string;
   activeNav: WorkspaceNav;
   viewerDocId: string | null;
+};
+
+type DeletedChatTombstone = {
+  id: string;
+  deletedAt: number;
 };
 
 function toTimestamp(value: unknown) {
@@ -147,6 +158,82 @@ function normalizeChat(value: unknown): ChatSession | null {
     createdAt: toTimestamp(chat.createdAt),
     updatedAt: toTimestamp(chat.updatedAt),
   };
+}
+
+function mapApiChat(chat: ChatResponse): ChatSession | null {
+  return normalizeChat({
+    id: chat.id,
+    title: chat.title,
+    activeDocIds: chat.active_doc_ids,
+    messages: chat.messages,
+    createdAt: chat.created_at,
+    updatedAt: chat.updated_at,
+  });
+}
+
+function mapDeletedChat(deleted: DeletedChatResponse): DeletedChatTombstone {
+  return {
+    id: deleted.id,
+    deletedAt: toTimestamp(deleted.deleted_at),
+  };
+}
+
+function sortChats(chats: ChatSession[]) {
+  return [...chats].sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
+function mergeChatCollections(
+  remoteChats: ChatSession[],
+  localChats: ChatSession[],
+  deletedChats: DeletedChatTombstone[],
+) {
+  const deletedIds = new Set(deletedChats.map((deletedChat) => deletedChat.id));
+  const merged = new Map<string, ChatSession>();
+
+  for (const chat of sortChats(remoteChats)) {
+    merged.set(chat.id, chat);
+  }
+
+  for (const chat of sortChats(localChats.filter((localChat) => !deletedIds.has(localChat.id)))) {
+    const existingChat = merged.get(chat.id);
+
+    if (!existingChat || chat.updatedAt > existingChat.updatedAt) {
+      merged.set(chat.id, chat);
+    }
+  }
+
+  return sortChats([...merged.values()]);
+}
+
+function serializeChatForApi(chat: ChatSession) {
+  return {
+    id: chat.id,
+    title: chat.title,
+    active_doc_ids: normalizeActiveDocIds(chat.activeDocIds),
+    messages: chat.messages
+      .filter((message) => message.content.trim().length > 0)
+      .map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        sources: (message.sources ?? []).map((source) => ({
+          id: source.id,
+          text: source.text,
+          score: source.score,
+          doc_id: source.doc_id,
+          chunk_id: source.chunk_id,
+          page: source.page,
+          bbox: source.bbox,
+          line_boxes: source.line_boxes,
+        })),
+      })),
+    created_at: new Date(chat.createdAt).toISOString(),
+    updated_at: new Date(chat.updatedAt).toISOString(),
+  };
+}
+
+function hasStreamingChatMessages(chats: ChatSession[]) {
+  return chats.some((chat) => chat.messages.some((message) => message.streaming));
 }
 
 function mapApiUser(user: ApiUserResponse): AppUser {
@@ -338,6 +425,7 @@ export default function App() {
 
   const [auth, setAuth] = useState<AuthSession | null>(persistedAuth);
   const [authLoading, setAuthLoading] = useState(Boolean(persistedAuth));
+  const [workspaceReady, setWorkspaceReady] = useState(() => !persistedAuth);
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [passwordResetToken, setPasswordResetToken] = useState<string | null>(() =>
     readPasswordResetToken(),
@@ -396,6 +484,7 @@ export default function App() {
     setLoading(false);
     setUploading(false);
     setAuthLoading(false);
+    setWorkspaceReady(false);
   };
 
   const clearPasswordResetToken = () => {
@@ -493,22 +582,73 @@ export default function App() {
 
   useEffect(() => {
     if (!auth?.user.id) {
+      setWorkspaceReady(false);
       return;
     }
 
+    let ignore = false;
     const persistedWorkspace = loadPersistedWorkspace(auth.user.id);
-    const nextChats = persistedWorkspace?.chats ?? [createChat()];
-    const nextActiveChatId =
-      persistedWorkspace?.activeChatId && nextChats.some((chat) => chat.id === persistedWorkspace.activeChatId)
-        ? persistedWorkspace.activeChatId
-        : nextChats[0].id;
+    setWorkspaceReady(false);
 
-    setChats(nextChats);
-    setActiveChatId(nextActiveChatId);
-    setActiveNav(persistedWorkspace?.activeNav ?? "workspace");
-    setViewerDocId(persistedWorkspace?.viewerDocId ?? null);
-    setSelectedSource(null);
-    setPdfOpen(false);
+    listChats()
+      .then((response) => {
+        if (ignore) {
+          return;
+        }
+
+        const remoteChats = response.chats
+          .map((chat) => mapApiChat(chat))
+          .filter((chat): chat is ChatSession => Boolean(chat));
+        const deletedChats = response.deleted.map((deletedChat) => mapDeletedChat(deletedChat));
+        const mergedChats = mergeChatCollections(
+          remoteChats,
+          persistedWorkspace?.chats ?? [],
+          deletedChats,
+        );
+        const nextChats = mergedChats.length > 0 ? mergedChats : [createChat()];
+        const nextActiveChatId =
+          persistedWorkspace?.activeChatId &&
+          nextChats.some((chat) => chat.id === persistedWorkspace.activeChatId)
+            ? persistedWorkspace.activeChatId
+            : nextChats[0].id;
+
+        setChats(nextChats);
+        setActiveChatId(nextActiveChatId);
+        setActiveNav(persistedWorkspace?.activeNav ?? "workspace");
+        setViewerDocId(persistedWorkspace?.viewerDocId ?? null);
+        setSelectedSource(null);
+        setPdfOpen(false);
+        setWorkspaceReady(true);
+      })
+      .catch((error) => {
+        if (ignore) {
+          return;
+        }
+
+        console.error("Failed to load remote chat history", error);
+        if (handleUnauthorized(error)) {
+          return;
+        }
+
+        const fallbackChats = persistedWorkspace?.chats ?? [createChat()];
+        const fallbackActiveChatId =
+          persistedWorkspace?.activeChatId &&
+          fallbackChats.some((chat) => chat.id === persistedWorkspace.activeChatId)
+            ? persistedWorkspace.activeChatId
+            : fallbackChats[0].id;
+
+        setChats(fallbackChats);
+        setActiveChatId(fallbackActiveChatId);
+        setActiveNav(persistedWorkspace?.activeNav ?? "workspace");
+        setViewerDocId(persistedWorkspace?.viewerDocId ?? null);
+        setSelectedSource(null);
+        setPdfOpen(false);
+        setWorkspaceReady(true);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, [auth?.user.id]);
 
   useEffect(() => {
@@ -594,6 +734,27 @@ export default function App() {
 
     window.localStorage.setItem(getWorkspaceStorageKey(auth.user.id), JSON.stringify(payload));
   }, [activeChat, activeNav, auth?.user.id, chats, viewerDocId]);
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      !workspaceReady ||
+      !auth?.user.id ||
+      chats.length === 0 ||
+      hasStreamingChatMessages(chats)
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void syncChats(chats.map((chat) => serializeChatForApi(chat))).catch((error) => {
+        console.error("Failed to sync chat history", error);
+        handleUnauthorized(error);
+      });
+    }, 700);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [auth?.user.id, chats, workspaceReady]);
 
   const pdfUrl =
     viewerDocId && auth?.token && viewerDocument?.pdfAvailable
@@ -1044,14 +1205,14 @@ export default function App() {
     }
   };
 
-  const handleDeleteChat = (chatId: string) => {
+  const handleDeleteChat = async (chatId: string) => {
     const targetChat = chats.find((chat) => chat.id === chatId);
     if (!targetChat) {
       return;
     }
 
     const shouldDelete = window.confirm(
-      `Delete "${targetChat.title}"? This removes the full conversation history from this browser.`,
+      `Delete "${targetChat.title}"? This removes the full conversation history from every signed-in device.`,
     );
     if (!shouldDelete) {
       return;
@@ -1060,19 +1221,40 @@ export default function App() {
     setDeletingChatId(chatId);
 
     try {
+      await deleteChatHistory(chatId);
       applyRemovedChats([chatId]);
+    } catch (error) {
+      console.error(error);
+      if (handleUnauthorized(error)) {
+        return;
+      }
+
+      if (activeChat) {
+        updateChat(activeChat.id, (chat) => ({
+          ...chat,
+          updatedAt: Date.now(),
+          messages: [
+            ...chat.messages,
+            createAssistantMessage(
+              error instanceof Error
+                ? error.message
+                : "There was an error deleting the conversation.",
+            ),
+          ],
+        }));
+      }
     } finally {
       setDeletingChatId(null);
     }
   };
 
-  const handleClearChats = () => {
+  const handleClearChats = async () => {
     if (chats.length === 0) {
       return;
     }
 
     const shouldClear = window.confirm(
-      `Delete all ${chats.length} conversation${chats.length === 1 ? "" : "s"}? This clears the local chat history and starts a fresh session.`,
+      `Delete all ${chats.length} conversation${chats.length === 1 ? "" : "s"}? This clears the shared chat history on every signed-in device.`,
     );
     if (!shouldClear) {
       return;
@@ -1081,7 +1263,28 @@ export default function App() {
     setClearingChats(true);
 
     try {
+      await clearChatHistory();
       applyRemovedChats(chats.map((chat) => chat.id));
+    } catch (error) {
+      console.error(error);
+      if (handleUnauthorized(error)) {
+        return;
+      }
+
+      if (activeChat) {
+        updateChat(activeChat.id, (chat) => ({
+          ...chat,
+          updatedAt: Date.now(),
+          messages: [
+            ...chat.messages,
+            createAssistantMessage(
+              error instanceof Error
+                ? error.message
+                : "There was an error clearing the shared conversations.",
+            ),
+          ],
+        }));
+      }
     } finally {
       setClearingChats(false);
     }
@@ -1094,6 +1297,7 @@ export default function App() {
     password: string;
   }) => {
     setAuthSubmitting(true);
+    setWorkspaceReady(false);
 
     try {
       const response =
@@ -1167,7 +1371,7 @@ export default function App() {
     );
   }
 
-  if (authLoading || !activeChat || !currentUser) {
+  if (authLoading || !workspaceReady || !activeChat || !currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-6 text-white">
         <div className="rounded-[28px] border border-white/10 bg-[var(--panel)] px-6 py-5 text-sm text-[var(--muted-foreground)] shadow-[0_24px_80px_-48px_rgba(15,23,42,0.8)]">

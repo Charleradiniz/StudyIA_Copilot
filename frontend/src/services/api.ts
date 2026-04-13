@@ -111,6 +111,67 @@ export type AskQuestionResponse = {
   }[];
 };
 
+export type ChatSourceResponse = {
+  id: number | string;
+  text: string;
+  score?: number;
+  doc_id?: string;
+  chunk_id?: number;
+  page?: number;
+  bbox?: number[];
+  line_boxes?: number[][];
+};
+
+export type ChatMessageResponse = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  sources?: ChatSourceResponse[];
+};
+
+export type ChatResponse = {
+  id: string;
+  title: string;
+  active_doc_ids: string[];
+  messages: ChatMessageResponse[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type DeletedChatResponse = {
+  id: string;
+  deleted_at: string;
+};
+
+export type ChatsResponse = {
+  chats: ChatResponse[];
+  deleted: DeletedChatResponse[];
+};
+
+export type SyncChatPayload = {
+  id: string;
+  title: string;
+  active_doc_ids: string[];
+  messages: ChatMessageResponse[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type SyncChatsResponse = {
+  synced_chat_ids: string[];
+  skipped_chat_ids: string[];
+};
+
+export type DeleteChatResponse = {
+  chat_id: string;
+  deleted: boolean;
+};
+
+export type ClearChatsResponse = {
+  deleted_count: number;
+  deleted_chat_ids: string[];
+};
+
 export function setAuthToken(token: string | null) {
   authToken = token;
 }
@@ -217,6 +278,39 @@ export async function loginUser(payload: { email: string; password: string }) {
 export async function getCurrentUser() {
   const res = await apiFetch("/api/auth/me");
   return parseResponse<AuthMeResponse>(res);
+}
+
+export async function listChats() {
+  const res = await apiFetch("/api/chats");
+  return parseResponse<ChatsResponse>(res);
+}
+
+export async function syncChats(chats: SyncChatPayload[]) {
+  const res = await apiFetch("/api/chats/sync", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ chats }),
+  });
+
+  return parseResponse<SyncChatsResponse>(res);
+}
+
+export async function deleteChatHistory(chatId: string) {
+  const res = await apiFetch(`/api/chats/${encodeURIComponent(chatId)}`, {
+    method: "DELETE",
+  });
+
+  return parseResponse<DeleteChatResponse>(res);
+}
+
+export async function clearChatHistory() {
+  const res = await apiFetch("/api/chats", {
+    method: "DELETE",
+  });
+
+  return parseResponse<ClearChatsResponse>(res);
 }
 
 export async function logoutUser() {

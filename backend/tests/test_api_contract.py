@@ -16,6 +16,7 @@ os.environ["GEMINI_API_KEY"] = ""
 
 from app.db import database as db_module
 from app.routes import auth as auth_route
+from app.routes import chats as chats_route
 from app.routes import pdf as pdf_route
 from app.routes import system as system_route
 from app.routes import upload as upload_route
@@ -36,6 +37,7 @@ LONG_TEXT = (
 def build_test_app() -> FastAPI:
     app = FastAPI(title="StudyIA Copilot Test API")
     app.include_router(auth_route.router, prefix="/api")
+    app.include_router(chats_route.router, prefix="/api")
     app.include_router(upload_route.router, prefix="/api")
     app.include_router(query_module.router, prefix="/api")
     app.include_router(pdf_route.router, prefix="/api")
@@ -310,6 +312,111 @@ class ApiContractTests(unittest.TestCase):
             new_login_response.json()["user"]["email"],
             "charles@example.com",
         )
+
+    def test_chat_history_syncs_across_sessions_for_the_same_user(self) -> None:
+        auth = self.register_user()
+        headers = self.auth_headers(auth["token"])
+        chat_payload = {
+            "id": "chat-shared",
+            "title": "Shared Workspace History",
+            "active_doc_ids": ["doc-1"],
+            "messages": [
+                {
+                    "id": "msg-1",
+                    "role": "assistant",
+                    "content": "Welcome back.",
+                    "sources": [],
+                },
+                {
+                    "id": "msg-2",
+                    "role": "user",
+                    "content": "Continue the conversation from mobile.",
+                    "sources": [],
+                },
+            ],
+            "created_at": "2026-04-13T12:00:00+00:00",
+            "updated_at": "2026-04-13T12:05:00+00:00",
+        }
+
+        sync_response = self.client.post(
+            "/api/chats/sync",
+            headers=headers,
+            json={"chats": [chat_payload]},
+        )
+
+        self.assertEqual(sync_response.status_code, 200, sync_response.text)
+        self.assertEqual(sync_response.json()["synced_chat_ids"], ["chat-shared"])
+
+        second_login_response = self.client.post(
+            "/api/auth/login",
+            json={
+                "email": "charles@example.com",
+                "password": "password123",
+            },
+        )
+        self.assertEqual(second_login_response.status_code, 200, second_login_response.text)
+        second_headers = self.auth_headers(second_login_response.json()["token"])
+
+        chats_response = self.client.get("/api/chats", headers=second_headers)
+
+        self.assertEqual(chats_response.status_code, 200, chats_response.text)
+        payload = chats_response.json()
+
+        self.assertEqual(payload["deleted"], [])
+        self.assertEqual(len(payload["chats"]), 1)
+        self.assertEqual(payload["chats"][0]["id"], "chat-shared")
+        self.assertEqual(payload["chats"][0]["title"], "Shared Workspace History")
+        self.assertEqual(payload["chats"][0]["active_doc_ids"], ["doc-1"])
+        self.assertEqual(
+            payload["chats"][0]["messages"][1]["content"],
+            "Continue the conversation from mobile.",
+        )
+
+    def test_deleted_chat_creates_a_tombstone_and_blocks_stale_resync(self) -> None:
+        auth = self.register_user()
+        headers = self.auth_headers(auth["token"])
+        chat_payload = {
+            "id": "chat-to-delete",
+            "title": "Delete Me",
+            "active_doc_ids": [],
+            "messages": [
+                {
+                    "id": "msg-1",
+                    "role": "assistant",
+                    "content": "This should disappear everywhere.",
+                    "sources": [],
+                }
+            ],
+            "created_at": "2026-04-13T13:00:00+00:00",
+            "updated_at": "2026-04-13T13:01:00+00:00",
+        }
+
+        first_sync_response = self.client.post(
+            "/api/chats/sync",
+            headers=headers,
+            json={"chats": [chat_payload]},
+        )
+        self.assertEqual(first_sync_response.status_code, 200, first_sync_response.text)
+
+        delete_response = self.client.delete("/api/chats/chat-to-delete", headers=headers)
+        self.assertEqual(delete_response.status_code, 200, delete_response.text)
+        self.assertTrue(delete_response.json()["deleted"])
+
+        stale_sync_response = self.client.post(
+            "/api/chats/sync",
+            headers=headers,
+            json={"chats": [chat_payload]},
+        )
+        self.assertEqual(stale_sync_response.status_code, 200, stale_sync_response.text)
+        self.assertEqual(stale_sync_response.json()["synced_chat_ids"], [])
+        self.assertEqual(stale_sync_response.json()["skipped_chat_ids"], ["chat-to-delete"])
+
+        chats_response = self.client.get("/api/chats", headers=headers)
+        self.assertEqual(chats_response.status_code, 200, chats_response.text)
+        payload = chats_response.json()
+
+        self.assertEqual(payload["chats"], [])
+        self.assertEqual(payload["deleted"][0]["id"], "chat-to-delete")
 
     def test_prompt_instructions_encourage_more_developed_answers(self) -> None:
         prompt = llm_module.build_prompt(
