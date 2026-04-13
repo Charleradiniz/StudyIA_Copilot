@@ -1209,6 +1209,7 @@ export default function App() {
           onClearChats={handleClearChats}
           onClearDocuments={handleClearDocuments}
           onCloseMobile={() => setMobileSidebarOpen(false)}
+          onOpenMobile={() => setMobileSidebarOpen(true)}
           onDeleteChat={handleDeleteChat}
           onDeleteDocument={handleDeleteDocument}
           onLogout={handleLogout}

@@ -54,6 +54,7 @@ const baseProps = {
   onClearChats: vi.fn(),
   onClearDocuments: vi.fn(),
   onCloseMobile: vi.fn(),
+  onOpenMobile: vi.fn(),
   onDeleteChat: vi.fn(),
   onDeleteDocument: vi.fn(),
   onLogout: vi.fn(),
@@ -102,6 +103,23 @@ describe("SidebarPanel", () => {
     expect(
       screen.queryByRole("button", { name: "Delete Architecture Notes.pdf" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("hides workspace tabs on mobile and keeps both sections in the drawer", () => {
+    render(
+      <SidebarPanel
+        {...baseProps}
+        activeNav="activity"
+        isDesktop={false}
+        mobileOpen
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Workspace" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Documents" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Activity" })).not.toBeInTheDocument();
+    expect(screen.getByText("Document library")).toBeInTheDocument();
+    expect(screen.getByText("Chat history")).toBeInTheDocument();
   });
 
   it("toggles a document into the active answer set", async () => {

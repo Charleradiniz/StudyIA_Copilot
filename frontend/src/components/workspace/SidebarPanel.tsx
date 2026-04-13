@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { formatRelativeTime, getChatPreview } from "../../app/chat-utils";
 import type { AppDocument, ChatSession } from "../../app/types";
 
@@ -20,6 +21,7 @@ type Props = {
   onClearChats: () => void;
   onClearDocuments: () => void;
   onCloseMobile: () => void;
+  onOpenMobile: () => void;
   onDeleteChat: (chatId: string) => void;
   onDeleteDocument: (docId: string) => void;
   onLogout: () => void;
@@ -48,6 +50,7 @@ export default function SidebarPanel({
   onClearChats,
   onClearDocuments,
   onCloseMobile,
+  onOpenMobile,
   onDeleteChat,
   onDeleteDocument,
   onLogout,
@@ -56,6 +59,8 @@ export default function SidebarPanel({
   onSelectChat,
   onToggleDocument,
 }: Props) {
+  const edgeSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const drawerSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const hasMeaningfulHistory = (chat: ChatSession) =>
     chat.messages.some((message) => message.role === "user");
   const getChatDocumentSummary = (chat: ChatSession) => {
@@ -73,16 +78,80 @@ export default function SidebarPanel({
   };
 
   const canManageChats = chats.length > 1 || chats.some(hasMeaningfulHistory);
-  const showDocuments = activeNav === "workspace" || activeNav === "documents";
-  const showChats = activeNav === "workspace" || activeNav === "activity";
+  const showDocuments = !isDesktop || activeNav === "workspace" || activeNav === "documents";
+  const showChats = !isDesktop || activeNav === "workspace" || activeNav === "activity";
   const closeMobilePanel = () => {
     if (!isDesktop) {
+      onCloseMobile();
+    }
+  };
+  const startEdgeSwipe = (clientX: number, clientY: number) => {
+    if (isDesktop || mobileOpen || clientX > 32) {
+      edgeSwipeStartRef.current = null;
+      return;
+    }
+
+    edgeSwipeStartRef.current = { x: clientX, y: clientY };
+  };
+  const finishEdgeSwipe = (clientX: number, clientY: number) => {
+    const swipeStart = edgeSwipeStartRef.current;
+    edgeSwipeStartRef.current = null;
+
+    if (!swipeStart) {
+      return;
+    }
+
+    const deltaX = clientX - swipeStart.x;
+    const deltaY = Math.abs(clientY - swipeStart.y);
+
+    if (deltaX > 72 && deltaY < 64) {
+      onOpenMobile();
+    }
+  };
+  const startDrawerSwipe = (clientX: number, clientY: number) => {
+    if (isDesktop || !mobileOpen) {
+      drawerSwipeStartRef.current = null;
+      return;
+    }
+
+    drawerSwipeStartRef.current = { x: clientX, y: clientY };
+  };
+  const finishDrawerSwipe = (clientX: number, clientY: number) => {
+    const swipeStart = drawerSwipeStartRef.current;
+    drawerSwipeStartRef.current = null;
+
+    if (!swipeStart) {
+      return;
+    }
+
+    const deltaX = swipeStart.x - clientX;
+    const deltaY = Math.abs(clientY - swipeStart.y);
+
+    if (deltaX > 72 && deltaY < 64) {
       onCloseMobile();
     }
   };
 
   return (
     <>
+      {!isDesktop && !mobileOpen && (
+        <div
+          aria-hidden="true"
+          className="fixed inset-y-0 left-0 z-30 w-5 lg:hidden"
+          onTouchStart={(event) => {
+            const touch = event.touches[0];
+            if (touch) {
+              startEdgeSwipe(touch.clientX, touch.clientY);
+            }
+          }}
+          onTouchEnd={(event) => {
+            const touch = event.changedTouches[0];
+            if (touch) {
+              finishEdgeSwipe(touch.clientX, touch.clientY);
+            }
+          }}
+        />
+      )}
       <button
         type="button"
         aria-label="Close workspace panel"
@@ -96,6 +165,18 @@ export default function SidebarPanel({
       <aside
         aria-label="Workspace panel"
         aria-hidden={!isDesktop && !mobileOpen}
+        onTouchStart={(event) => {
+          const touch = event.touches[0];
+          if (touch) {
+            startDrawerSwipe(touch.clientX, touch.clientY);
+          }
+        }}
+        onTouchEnd={(event) => {
+          const touch = event.changedTouches[0];
+          if (touch) {
+            finishDrawerSwipe(touch.clientX, touch.clientY);
+          }
+        }}
         className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(92vw,380px)] max-w-[380px] shrink-0 flex-col border-r border-white/10 bg-[var(--panel-strong)]/95 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] backdrop-blur transition-transform duration-300 lg:static lg:z-auto lg:h-full lg:w-[300px] lg:max-w-none lg:translate-x-0 lg:border-b-0 xl:w-[320px] ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
@@ -148,26 +229,28 @@ export default function SidebarPanel({
               </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-black/10 p-1">
-              {[
-                ["workspace", "Workspace"],
-                ["documents", "Documents"],
-                ["activity", "Activity"],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => onChangeNav(value as Props["activeNav"])}
-                  className={`rounded-xl px-3 py-2 text-sm transition ${
-                    activeNav === value
-                      ? "bg-white text-[var(--panel-strong)] shadow-sm"
-                      : "text-[var(--muted-foreground)] hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {isDesktop && (
+              <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-black/10 p-1">
+                {[
+                  ["workspace", "Workspace"],
+                  ["documents", "Documents"],
+                  ["activity", "Activity"],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => onChangeNav(value as Props["activeNav"])}
+                    className={`rounded-xl px-3 py-2 text-sm transition ${
+                      activeNav === value
+                        ? "bg-white text-[var(--panel-strong)] shadow-sm"
+                        : "text-[var(--muted-foreground)] hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <button
               type="button"
@@ -185,7 +268,7 @@ export default function SidebarPanel({
             </button>
           </div>
 
-          <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5">
+          <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 lg:space-y-6 lg:py-5">
             {showDocuments && (
               <section className="rounded-3xl border border-white/10 bg-[var(--panel)] p-4 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.8)]">
               <div className="mb-4 flex items-center justify-between gap-3">
