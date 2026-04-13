@@ -29,6 +29,7 @@ type Props = {
   viewerDocId: string | null;
   onChangeInput: (value: string) => void;
   onOpenPdf: () => void;
+  onOpenSidebar: () => void;
   onOpenUpload: () => void;
   onSelectSource: (source: Source) => void;
   onSend: () => void;
@@ -60,6 +61,7 @@ export default function ChatWorkspace({
   viewerDocId,
   onChangeInput,
   onOpenPdf,
+  onOpenSidebar,
   onOpenUpload,
   onSelectSource,
   onSend,
@@ -72,10 +74,22 @@ export default function ChatWorkspace({
       : activeDocuments.length === 1
         ? `Grounded on ${activeDocuments[0].name}`
         : `Grounded on ${activeDocuments.length} PDFs at once`;
+  const activePageCount = activeDocuments.reduce(
+    (total, document) => total + document.pageCount,
+    0,
+  );
+  const activeChunkCount = activeDocuments.reduce(
+    (total, document) => total + document.chunkCount,
+    0,
+  );
+  const mobileViewerLabel =
+    viewerDocument?.name ??
+    `${activeDocuments.length} linked PDF${activeDocuments.length === 1 ? "" : "s"}`;
+  const viewerPdfAvailable = viewerDocument?.pdfAvailable ?? false;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col border-b border-white/10 lg:h-full lg:border-b-0 lg:border-r">
-      <div className="shrink-0 border-b border-white/10 bg-[var(--panel)]/85 px-5 py-5 backdrop-blur">
+      <div className="shrink-0 border-b border-white/10 bg-[var(--panel)]/85 px-4 py-4 backdrop-blur lg:px-5 lg:py-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
@@ -93,12 +107,16 @@ export default function ChatWorkspace({
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
                   {activeDocuments.length} active PDF{activeDocuments.length === 1 ? "" : "s"}
                 </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
-                  {activeDocuments.reduce((total, document) => total + document.pageCount, 0)} pages
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
-                  {activeDocuments.reduce((total, document) => total + document.chunkCount, 0)} chunks
-                </span>
+                {isDesktop && (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
+                    {activePageCount} pages
+                  </span>
+                )}
+                {isDesktop && (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
+                    {activeChunkCount} chunks
+                  </span>
+                )}
                 <span
                   className={`rounded-full px-3 py-1.5 text-xs font-medium ${
                     activeDocuments.every((document) => document.vectorReady)
@@ -115,23 +133,43 @@ export default function ChatWorkspace({
                     {systemStatus.ragMode} mode
                   </span>
                 )}
-                {activeDocuments.map((document) => (
-                  <span
-                    key={document.id}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
-                      viewerDocId === document.id
-                        ? "border-[var(--accent)] bg-[var(--accent-surface)] text-white"
-                        : "border-white/10 bg-white/5 text-[var(--muted-foreground)]"
-                    }`}
-                  >
-                    {document.name}
+                {viewerDocument && !viewerPdfAvailable && (
+                  <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1.5 text-xs font-medium text-amber-100">
+                    Original PDF unavailable
                   </span>
-                ))}
+                )}
+                {isDesktop ? (
+                  activeDocuments.map((document) => (
+                    <span
+                      key={document.id}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                        viewerDocId === document.id
+                          ? "border-[var(--accent)] bg-[var(--accent-surface)] text-white"
+                          : "border-white/10 bg-white/5 text-[var(--muted-foreground)]"
+                      }`}
+                    >
+                      {document.name}
+                    </span>
+                  ))
+                ) : (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
+                    Viewing: {mobileViewerLabel}
+                  </span>
+                )}
               </div>
             )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {!isDesktop && (
+              <button
+                type="button"
+                onClick={onOpenSidebar}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+              >
+                Workspace
+              </button>
+            )}
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
               {documentsCount} docs
             </span>
@@ -142,16 +180,17 @@ export default function ChatWorkspace({
               <button
                 type="button"
                 onClick={onOpenPdf}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+                disabled={!viewerPdfAvailable}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Open PDF
+                {viewerPdfAvailable ? "Open PDF" : "PDF unavailable"}
               </button>
             )}
           </div>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-5 lg:py-6">
         <div className="mx-auto flex max-w-4xl flex-col gap-4">
           {activeChat.messages.map((message) => {
             const isUser = message.role === "user";
@@ -224,7 +263,7 @@ export default function ChatWorkspace({
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-white/10 bg-[var(--panel)]/85 px-5 py-4 backdrop-blur">
+      <div className="shrink-0 border-t border-white/10 bg-[var(--panel)]/85 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur lg:px-5 lg:py-4 lg:pb-4">
         <div className="mx-auto max-w-4xl rounded-[28px] border border-white/10 bg-black/20 p-3 shadow-[0_18px_60px_-42px_rgba(15,23,42,0.9)]">
           <div className="mb-3 flex items-center justify-between gap-3 px-2">
             <div>
@@ -232,11 +271,13 @@ export default function ChatWorkspace({
                 {viewerDocument?.name ?? (hasActiveDocuments ? "Select a PDF in the viewer" : "No document selected")}
               </p>
               <p className="text-xs text-[var(--muted-foreground)]">
-                {hasActiveDocuments
+                {!viewerPdfAvailable && viewerDocument
+                  ? "The indexed text is still available, but the original PDF file is no longer on the server."
+                  : hasActiveDocuments
                   ? "Ask across all active PDFs and inspect the exact source document in the viewer."
                   : "Use the sidebar to upload or activate one or more documents."}
               </p>
-              {viewerDocument?.preview && (
+              {isDesktop && viewerDocument?.preview && (
                 <p className="mt-2 max-w-2xl line-clamp-2 text-xs leading-5 text-[var(--muted-foreground)]">
                   {viewerDocument.preview}
                 </p>

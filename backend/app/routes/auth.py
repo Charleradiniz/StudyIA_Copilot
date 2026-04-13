@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
+import logging
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -28,6 +29,7 @@ from app.services.email import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+logger = logging.getLogger("studyiacopilot.auth")
 
 
 class RegisterRequest(BaseModel):
@@ -73,6 +75,15 @@ def serialize_user(user: User) -> dict:
         "full_name": user.full_name,
         "created_at": serialize_datetime(user.created_at),
     }
+
+
+def resolve_request_origin(request: Request) -> str | None:
+    origin = (request.headers.get("origin") or "").strip()
+    if origin:
+        return origin.rstrip("/")
+
+    base_url = str(request.base_url).strip()
+    return base_url.rstrip("/") if base_url else None
 
 
 def create_user_session(db: Session, user: User) -> tuple[str, AuthSession]:
@@ -160,7 +171,11 @@ def login_user(data: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/password-reset/request")
-def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
+def request_password_reset(
+    request: Request,
+    data: PasswordResetRequest,
+    db: Session = Depends(get_db),
+):
     email = validate_email(data.email)
     user = db.query(User).filter(User.email == email).first()
 
@@ -171,12 +186,33 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
                 recipient_email=user.email,
                 recipient_name=user.full_name,
                 reset_token=token,
+                request_origin=resolve_request_origin(request),
             )
-        except (EmailConfigurationError, EmailDeliveryError) as exc:
+        except EmailConfigurationError as exc:
             db.query(PasswordResetToken).filter(
                 PasswordResetToken.token_hash == hash_session_token(token)
             ).delete(synchronize_session=False)
             db.commit()
+            logger.warning(
+                "password_reset_email_configuration_error user_id=%s email=%s detail=%s",
+                user.id,
+                user.email,
+                str(exc),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(exc),
+            ) from exc
+        except EmailDeliveryError as exc:
+            db.query(PasswordResetToken).filter(
+                PasswordResetToken.token_hash == hash_session_token(token)
+            ).delete(synchronize_session=False)
+            db.commit()
+            logger.exception(
+                "password_reset_email_delivery_error user_id=%s email=%s",
+                user.id,
+                user.email,
+            )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=str(exc),

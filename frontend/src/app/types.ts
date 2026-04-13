@@ -53,6 +53,7 @@ export type AppDocument = {
   ragMode: string;
   vectorReady: boolean;
   preview: string;
+  pdfAvailable: boolean;
 };
 
 export type SystemStatus = {

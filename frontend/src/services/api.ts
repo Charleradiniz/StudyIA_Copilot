@@ -1,4 +1,5 @@
 export const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
 
 let authToken: string | null = null;
 
@@ -53,6 +54,7 @@ export type UploadPdfResponse = {
   vector_ready: boolean;
   uploaded_at: string;
   preview: string;
+  pdf_available: boolean;
 };
 
 export type DocumentSummaryResponse = {
@@ -64,6 +66,7 @@ export type DocumentSummaryResponse = {
   vector_ready: boolean;
   uploaded_at?: string;
   preview: string;
+  pdf_available: boolean;
 };
 
 export type DocumentsResponse = {
@@ -139,11 +142,44 @@ function createHeaders(headers?: HeadersInit) {
 
 async function apiFetch(path: string, init?: RequestInit) {
   const headers = createHeaders(init?.headers);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
+  const externalSignal = init?.signal;
+  let cleanupExternalAbort: (() => void) | undefined;
 
-  return fetch(`${API_URL}${path}`, {
-    ...init,
-    headers,
-  });
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort();
+    } else {
+      const abortFromExternalSignal = () => controller.abort();
+      externalSignal.addEventListener("abort", abortFromExternalSignal, { once: true });
+      cleanupExternalAbort = () =>
+        externalSignal.removeEventListener("abort", abortFromExternalSignal);
+    }
+  }
+
+  try {
+    return await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError(
+        "The server took too long to respond. Check your connection and try again.",
+        0,
+      );
+    }
+
+    throw new ApiError(
+      "Could not connect to the server. Check the API URL and network access.",
+      0,
+    );
+  } finally {
+    clearTimeout(timeoutId);
+    cleanupExternalAbort?.();
+  }
 }
 
 export async function registerUser(payload: {

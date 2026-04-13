@@ -14,6 +14,7 @@ from app.services.storage import (
     delete_saved_document,
     iter_doc_id_candidates,
     iter_saved_documents,
+    resolve_upload_path,
 )
 
 router = APIRouter()
@@ -24,7 +25,7 @@ def evict_document_cache(user_id: str, doc_id: str):
         DOCUMENTS.pop(get_document_cache_key(user_id, candidate), None)
 
 
-def serialize_document(record: dict):
+def serialize_document(record: dict, user_id: str):
     metadata = record.get("metadata") or {}
     documents = record.get("documents") or []
     page_numbers = [
@@ -32,6 +33,9 @@ def serialize_document(record: dict):
         for chunk in documents
         if isinstance(chunk.get("page"), int)
     ]
+    pdf_available = (
+        resolve_upload_path(record["doc_id"], user_id, metadata) is not None
+    )
 
     return {
         "doc_id": record["doc_id"],
@@ -46,13 +50,14 @@ def serialize_document(record: dict):
         ),
         "uploaded_at": metadata.get("uploaded_at"),
         "preview": metadata.get("preview") or ((documents[0].get("text") or "")[:220] if documents else ""),
+        "pdf_available": pdf_available,
     }
 
 
 @router.get("/documents")
 def list_documents(current_user: User = Depends(get_current_user)):
     documents = [
-        serialize_document(record)
+        serialize_document(record, current_user.id)
         for record in iter_saved_documents(current_user.id)
     ]
 
@@ -79,7 +84,7 @@ def get_document_details(
         "index": doc.get("index"),
         "metadata": doc.get("metadata", {}),
     }
-    return serialize_document(payload)
+    return serialize_document(payload, current_user.id)
 
 
 @router.delete("/documents/{doc_id}")

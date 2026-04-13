@@ -176,6 +176,7 @@ function mapApiDocument(document: DocumentSummaryResponse): AppDocument {
     ragMode: document.rag_mode,
     vectorReady: document.vector_ready,
     preview: document.preview,
+    pdfAvailable: document.pdf_available ?? true,
   };
 }
 
@@ -360,6 +361,7 @@ export default function App() {
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
   );
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const isAuthenticated = Boolean(auth?.token);
   const activeChat = useMemo(
@@ -420,7 +422,11 @@ export default function App() {
 
     const mediaQuery = window.matchMedia("(min-width: 1024px)");
     const syncLayoutMode = (event?: MediaQueryListEvent) => {
-      setIsDesktop(event?.matches ?? mediaQuery.matches);
+      const nextIsDesktop = event?.matches ?? mediaQuery.matches;
+      setIsDesktop(nextIsDesktop);
+      if (nextIsDesktop) {
+        setMobileSidebarOpen(false);
+      }
     };
 
     syncLayoutMode();
@@ -590,7 +596,7 @@ export default function App() {
   }, [activeChat, activeNav, auth?.user.id, chats, viewerDocId]);
 
   const pdfUrl =
-    viewerDocId && auth?.token
+    viewerDocId && auth?.token && viewerDocument?.pdfAvailable
       ? `${API_URL}/api/pdf/${viewerDocId}?token=${encodeURIComponent(auth.token)}`
       : "";
 
@@ -1172,7 +1178,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--app-foreground)]">
+    <div className="h-[100dvh] min-h-[100dvh] overflow-hidden bg-[var(--app-bg)] text-[var(--app-foreground)]">
       <div className="flex h-full min-h-0 flex-col lg:flex-row">
         <input
           ref={fileInputRef}
@@ -1194,12 +1200,15 @@ export default function App() {
           deletingChatId={deletingChatId}
           deletingDocId={deletingDocId}
           documents={documents}
+          isDesktop={isDesktop}
+          mobileOpen={mobileSidebarOpen}
           uploading={uploading}
           userName={currentUser.fullName}
           userEmail={currentUser.email}
           onChangeNav={setActiveNav}
           onClearChats={handleClearChats}
           onClearDocuments={handleClearDocuments}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
           onDeleteChat={handleDeleteChat}
           onDeleteDocument={handleDeleteDocument}
           onLogout={handleLogout}
@@ -1227,6 +1236,7 @@ export default function App() {
             viewerDocId={viewerDocId}
             onChangeInput={setInput}
             onOpenPdf={() => setPdfOpen(true)}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
             onOpenUpload={() => fileInputRef.current?.click()}
             onSelectSource={handleSelectSource}
             onSend={handleSend}

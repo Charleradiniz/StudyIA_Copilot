@@ -32,6 +32,8 @@ export default function PdfModal({
   onSelectViewerDoc,
 }: Props) {
   const isValidUrl = fileUrl.trim().length > 0;
+  const viewerDocument =
+    activeDocuments.find((document) => document.id === viewerDocId) ?? activeDocuments[0] ?? null;
 
   useEffect(() => {
     if (!open) return;
@@ -122,8 +124,15 @@ export default function PdfModal({
               />
             </Suspense>
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-neutral-400">
-              No PDF file specified
+            <div className="flex h-full w-full flex-col items-center justify-center px-8 text-center text-neutral-400">
+              <p className="text-base font-medium text-white">
+                {viewerDocument ? "PDF unavailable" : "No PDF selected"}
+              </p>
+              <p className="mt-3 max-w-sm text-sm leading-6 text-[var(--muted-foreground)]">
+                {viewerDocument
+                  ? "The indexed text is still available, but the original PDF file is no longer on the server."
+                  : "Select a document to open the mobile PDF viewer."}
+              </p>
             </div>
           )}
         </div>

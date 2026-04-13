@@ -104,6 +104,7 @@ function createDocument(overrides: Partial<Record<string, unknown>> = {}) {
     vector_ready: true,
     uploaded_at: "2026-04-09T12:00:00.000Z",
     preview: "A concise technical preview for the indexed document.",
+    pdf_available: true,
     ...overrides,
   };
 }

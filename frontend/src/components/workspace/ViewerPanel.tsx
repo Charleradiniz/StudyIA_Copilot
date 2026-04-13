@@ -24,6 +24,7 @@ export default function ViewerPanel({
 }: Props) {
   const viewerDocument =
     activeDocuments.find((document) => document.id === viewerDocId) ?? activeDocuments[0] ?? null;
+  const viewerPdfAvailable = viewerDocument?.pdfAvailable ?? false;
 
   return (
     <section className="hidden h-full min-h-0 w-[44%] min-w-[380px] max-w-[720px] flex-col bg-[var(--panel-strong)] lg:flex">
@@ -37,7 +38,9 @@ export default function ViewerPanel({
               {viewerDocument?.name ?? "No document open"}
             </h3>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              {selectedSource && typeof selectedSource.page === "number"
+              {!viewerPdfAvailable && viewerDocument
+                ? "The extracted content is still indexed, but the original PDF file is no longer available on the server."
+                : selectedSource && typeof selectedSource.page === "number"
                 ? `Focused on page ${selectedSource.page + 1}`
                 : viewerDocument
                   ? "Switch between active PDFs or pick a source to jump to the exact passage."
@@ -79,6 +82,7 @@ export default function ViewerPanel({
       <div className="min-h-0 flex-1 overflow-hidden p-4">
         <div className="h-full overflow-hidden rounded-[28px] border border-white/10 bg-[var(--panel)] shadow-[0_30px_90px_-48px_rgba(15,23,42,0.9)]">
           {viewerDocument ? (
+            viewerPdfAvailable ? (
             <Suspense
               fallback={
                 <div className="flex h-full items-center justify-center text-sm text-[var(--muted-foreground)]">
@@ -94,6 +98,19 @@ export default function ViewerPanel({
                 focusToken={focusToken}
               />
             </Suspense>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center px-8 text-center">
+                <div className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-amber-100">
+                  PDF unavailable
+                </div>
+                <h4 className="mt-5 text-2xl font-semibold text-white">
+                  The original file is no longer on the server
+                </h4>
+                <p className="mt-3 max-w-sm text-sm leading-6 text-[var(--muted-foreground)]">
+                  The text chunks are still available for chat, but the PDF viewer cannot open this document until it is uploaded again.
+                </p>
+              </div>
+            )
           ) : (
             <div className="flex h-full flex-col items-center justify-center px-8 text-center">
               <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-[var(--muted-foreground)]">

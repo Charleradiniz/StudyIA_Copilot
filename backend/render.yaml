@@ -16,3 +16,25 @@ services:
         value: lite
       - key: CORS_ORIGINS
         sync: false
+      - key: APP_NAME
+        value: StudyIA Copilot
+      - key: PASSWORD_RESET_TOKEN_TTL_MINUTES
+        value: "60"
+      - key: PASSWORD_RESET_URL_TEMPLATE
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: StudyIA Copilot
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: SMTP_USE_SSL
+        value: "false"

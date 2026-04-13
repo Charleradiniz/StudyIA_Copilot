@@ -463,6 +463,7 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(upload_payload["pages"], 1)
         self.assertFalse(upload_payload["vector_ready"])
         self.assertEqual(upload_payload["rag_mode"], "lite")
+        self.assertTrue(upload_payload["pdf_available"])
 
         documents_response = self.client.get("/api/documents", headers=headers)
         self.assertEqual(documents_response.status_code, 200)
@@ -473,6 +474,7 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(documents[0]["name"], "study-guide.pdf")
         self.assertGreaterEqual(documents[0]["chunks"], 1)
         self.assertIn("StudyIA Copilot", documents[0]["preview"])
+        self.assertTrue(documents[0]["pdf_available"])
 
         status_response = self.client.get("/api/system/status", headers=headers)
         self.assertEqual(status_response.status_code, 200)
@@ -713,6 +715,7 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(payload[0]["chunks"], 1)
         self.assertFalse(payload[0]["vector_ready"])
         self.assertIn("Legacy storage format", payload[0]["preview"])
+        self.assertFalse(payload[0]["pdf_available"])
 
     def test_each_user_only_sees_their_own_documents(self) -> None:
         first_user = self.register_user(

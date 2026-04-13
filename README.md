@@ -113,7 +113,8 @@ RAG_MODE=full
 LOG_LEVEL=INFO
 APP_NAME=StudyIA Copilot
 PASSWORD_RESET_TOKEN_TTL_MINUTES=60
-PASSWORD_RESET_URL_TEMPLATE=http://127.0.0.1:5173/?reset_password_token={token}
+# Optional: if omitted, the backend uses the request origin for reset links
+PASSWORD_RESET_URL_TEMPLATE=
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USERNAME=your_smtp_user
@@ -280,6 +281,11 @@ SMTP_FROM_NAME=StudyIA Copilot
 SMTP_USE_TLS=true
 SMTP_USE_SSL=false
 ```
+
+Important:
+- Set a persistent `DATABASE_URL` in production. If it is missing, the backend falls back to a local SQLite file inside the running instance, which can make user accounts and sessions disappear after redeploys.
+- Password reset email only works after the SMTP variables above are configured in the production backend.
+- If `PASSWORD_RESET_URL_TEMPLATE` is omitted, the backend now falls back to the request origin when building the reset link.
 
 ### Vercel frontend
 

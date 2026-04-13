@@ -43,10 +43,7 @@ APP_NAME = os.getenv("APP_NAME", "StudyIA Copilot")
 PASSWORD_RESET_TOKEN_TTL_MINUTES = int(
     os.getenv("PASSWORD_RESET_TOKEN_TTL_MINUTES", "60")
 )
-PASSWORD_RESET_URL_TEMPLATE = os.getenv(
-    "PASSWORD_RESET_URL_TEMPLATE",
-    "http://127.0.0.1:5173/?reset_password_token={token}",
-)
+PASSWORD_RESET_URL_TEMPLATE = os.getenv("PASSWORD_RESET_URL_TEMPLATE", "").strip()
 
 SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))

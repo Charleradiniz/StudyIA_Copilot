@@ -80,6 +80,7 @@ def build_upload_response(metadata: dict):
         "vector_ready": metadata["vector_ready"],
         "uploaded_at": metadata["uploaded_at"],
         "preview": metadata["preview"],
+        "pdf_available": True,
     }
 
 

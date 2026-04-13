@@ -11,12 +11,15 @@ type Props = {
   clearingDocuments: boolean;
   deletingChatId: string | null;
   deletingDocId: string | null;
+  isDesktop: boolean;
+  mobileOpen: boolean;
   uploading: boolean;
   userEmail: string;
   userName: string;
   onChangeNav: (nav: "workspace" | "documents" | "activity") => void;
   onClearChats: () => void;
   onClearDocuments: () => void;
+  onCloseMobile: () => void;
   onDeleteChat: (chatId: string) => void;
   onDeleteDocument: (docId: string) => void;
   onLogout: () => void;
@@ -36,12 +39,15 @@ export default function SidebarPanel({
   deletingChatId,
   deletingDocId,
   documents,
+  isDesktop,
+  mobileOpen,
   uploading,
   userEmail,
   userName,
   onChangeNav,
   onClearChats,
   onClearDocuments,
+  onCloseMobile,
   onDeleteChat,
   onDeleteDocument,
   onLogout,
@@ -69,79 +75,119 @@ export default function SidebarPanel({
   const canManageChats = chats.length > 1 || chats.some(hasMeaningfulHistory);
   const showDocuments = activeNav === "workspace" || activeNav === "documents";
   const showChats = activeNav === "workspace" || activeNav === "activity";
+  const closeMobilePanel = () => {
+    if (!isDesktop) {
+      onCloseMobile();
+    }
+  };
 
   return (
-    <aside className="w-full shrink-0 border-b border-white/10 bg-[var(--panel-strong)]/95 backdrop-blur lg:h-full lg:w-[300px] lg:border-b-0 lg:border-r xl:w-[320px]">
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="border-b border-white/10 px-5 py-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
-                Study Copilot
-              </p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-                Research workspace
-              </h1>
-              <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-                {userName} - {userEmail}
-              </p>
+    <>
+      <button
+        type="button"
+        aria-label="Close workspace panel"
+        aria-hidden={!mobileOpen}
+        tabIndex={mobileOpen ? 0 : -1}
+        onClick={onCloseMobile}
+        className={`fixed inset-0 z-40 bg-slate-950/70 transition duration-300 lg:hidden ${
+          mobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      />
+      <aside
+        aria-label="Workspace panel"
+        aria-hidden={!isDesktop && !mobileOpen}
+        className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(92vw,380px)] max-w-[380px] shrink-0 flex-col border-r border-white/10 bg-[var(--panel-strong)]/95 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] backdrop-blur transition-transform duration-300 lg:static lg:z-auto lg:h-full lg:w-[300px] lg:max-w-none lg:translate-x-0 lg:border-b-0 xl:w-[320px] ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="border-b border-white/10 px-5 py-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
+                  Study Copilot
+                </p>
+                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+                  Research workspace
+                </h1>
+                <p className="mt-2 text-xs text-[var(--muted-foreground)]">
+                  {userName} - {userEmail}
+                </p>
+              </div>
+
+              <div className="flex flex-col items-end gap-2">
+                {!isDesktop && (
+                  <button
+                    type="button"
+                    onClick={onCloseMobile}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-[var(--muted-foreground)] transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+                  >
+                    Close
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNewChat();
+                    closeMobilePanel();
+                  }}
+                  className="inline-flex items-center rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+                >
+                  New chat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLogout();
+                    closeMobilePanel();
+                  }}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-[var(--muted-foreground)] transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+                >
+                  Log out
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-col items-end gap-2">
-              <button
-                type="button"
-                onClick={onNewChat}
-                className="inline-flex items-center rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
-              >
-                New chat
-              </button>
-              <button
-                type="button"
-                onClick={onLogout}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-[var(--muted-foreground)] transition hover:border-white/20 hover:bg-white/10 hover:text-white"
-              >
-                Log out
-              </button>
+            <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-black/10 p-1">
+              {[
+                ["workspace", "Workspace"],
+                ["documents", "Documents"],
+                ["activity", "Activity"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onChangeNav(value as Props["activeNav"])}
+                  className={`rounded-xl px-3 py-2 text-sm transition ${
+                    activeNav === value
+                      ? "bg-white text-[var(--panel-strong)] shadow-sm"
+                      : "text-[var(--muted-foreground)] hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                onOpenUpload();
+                closeMobilePanel();
+              }}
+              disabled={uploading}
+              className="mt-5 flex w-full items-center justify-between rounded-2xl border border-[var(--accent-soft)] bg-[var(--accent-surface)] px-4 py-3 text-left text-sm font-medium text-white transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              <span>{uploading ? "Uploading document..." : "Upload a new PDF"}</span>
+              <span className="rounded-full bg-white/10 px-2 py-1 text-xs text-[var(--muted-foreground)]">
+                PDF
+              </span>
+            </button>
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-black/10 p-1">
-            {[
-              ["workspace", "Workspace"],
-              ["documents", "Documents"],
-              ["activity", "Activity"],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onChangeNav(value as Props["activeNav"])}
-                className={`rounded-xl px-3 py-2 text-sm transition ${
-                  activeNav === value
-                    ? "bg-white text-[var(--panel-strong)] shadow-sm"
-                    : "text-[var(--muted-foreground)] hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={onOpenUpload}
-            disabled={uploading}
-            className="mt-5 flex w-full items-center justify-between rounded-2xl border border-[var(--accent-soft)] bg-[var(--accent-surface)] px-4 py-3 text-left text-sm font-medium text-white transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            <span>{uploading ? "Uploading document..." : "Upload a new PDF"}</span>
-            <span className="rounded-full bg-white/10 px-2 py-1 text-xs text-[var(--muted-foreground)]">
-              PDF
-            </span>
-          </button>
-        </div>
-
-        <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5">
-          {showDocuments && (
-            <section className="rounded-3xl border border-white/10 bg-[var(--panel)] p-4 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.8)]">
+          <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5">
+            {showDocuments && (
+              <section className="rounded-3xl border border-white/10 bg-[var(--panel)] p-4 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.8)]">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-sm font-semibold text-white">Document library</h2>
@@ -192,7 +238,10 @@ export default function SidebarPanel({
                         <div className="flex items-start gap-3">
                           <button
                             type="button"
-                            onClick={() => onToggleDocument(document.id)}
+                            onClick={() => {
+                              onToggleDocument(document.id);
+                              closeMobilePanel();
+                            }}
                             aria-pressed={isActive}
                             className="min-w-0 flex-1 text-left"
                           >
@@ -220,6 +269,11 @@ export default function SidebarPanel({
                               <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[var(--muted-foreground)]">
                                 {document.chunkCount} chunks
                               </span>
+                              {!document.pdfAvailable && (
+                                <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-amber-100">
+                                  pdf unavailable
+                                </span>
+                              )}
                               <span
                                 className={`rounded-full px-2 py-1 ${
                                   document.vectorReady
@@ -253,8 +307,8 @@ export default function SidebarPanel({
                   })
                 )}
               </div>
-            </section>
-          )}
+              </section>
+            )}
 
           {showChats && (
             <section className="rounded-3xl border border-white/10 bg-[var(--panel)] p-4">
@@ -296,7 +350,10 @@ export default function SidebarPanel({
                       <div className="flex items-start gap-3">
                         <button
                           type="button"
-                          onClick={() => onSelectChat(chat.id)}
+                          onClick={() => {
+                            onSelectChat(chat.id);
+                            closeMobilePanel();
+                          }}
                           className="min-w-0 flex-1 text-left"
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -337,8 +394,9 @@ export default function SidebarPanel({
               </div>
             </section>
           )}
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
