@@ -111,6 +111,17 @@ GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-2.5-flash-lite
 RAG_MODE=full
 LOG_LEVEL=INFO
+APP_NAME=StudyIA Copilot
+PASSWORD_RESET_TOKEN_TTL_MINUTES=60
+PASSWORD_RESET_URL_TEMPLATE=http://127.0.0.1:5173/?reset_password_token={token}
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USERNAME=your_smtp_user
+SMTP_PASSWORD=your_smtp_password
+SMTP_FROM_EMAIL=no-reply@example.com
+SMTP_FROM_NAME=StudyIA Copilot
+SMTP_USE_TLS=true
+SMTP_USE_SSL=false
 ```
 
 Optional:
@@ -187,6 +198,7 @@ The current UI includes:
 - loading skeletons and streaming responses
 - mobile-friendly upload flow
 - local persistence of sessions with `localStorage` plus backend document catalog hydration
+- password recovery by email with one-time reset links
 
 This makes the app feel closer to a production SaaS experience rather than a single-screen prototype.
 
@@ -256,6 +268,17 @@ GEMINI_MODEL=gemini-2.5-flash-lite
 RAG_MODE=lite
 CORS_ORIGINS=https://your-frontend.vercel.app
 DATABASE_URL=your_database_url
+APP_NAME=StudyIA Copilot
+PASSWORD_RESET_TOKEN_TTL_MINUTES=60
+PASSWORD_RESET_URL_TEMPLATE=https://your-frontend.vercel.app/?reset_password_token={token}
+SMTP_HOST=smtp.your-provider.com
+SMTP_PORT=587
+SMTP_USERNAME=your_smtp_user
+SMTP_PASSWORD=your_smtp_password
+SMTP_FROM_EMAIL=no-reply@your-domain.com
+SMTP_FROM_NAME=StudyIA Copilot
+SMTP_USE_TLS=true
+SMTP_USE_SSL=false
 ```
 
 ### Vercel frontend

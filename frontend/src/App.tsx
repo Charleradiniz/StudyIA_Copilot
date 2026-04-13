@@ -21,12 +21,14 @@ import {
   ApiError,
   askQuestion,
   clearDocuments,
+  confirmPasswordReset,
   deleteDocument,
   getCurrentUser,
   getSystemStatus,
   loginUser,
   listDocuments,
   logoutUser,
+  requestPasswordReset,
   registerUser,
   setAuthToken,
   uploadPdf,
@@ -38,6 +40,7 @@ import {
 
 const AUTH_STORAGE_KEY = "studyiacopilot.auth.v1";
 const WORKSPACE_STORAGE_PREFIX = "studyiacopilot.workspace.v3";
+const PASSWORD_RESET_QUERY_KEY = "reset_password_token";
 
 type PersistedWorkspace = {
   chats: ChatSession[];
@@ -257,6 +260,30 @@ function getWorkspaceStorageKey(userId: string) {
   return `${WORKSPACE_STORAGE_PREFIX}.${userId}`;
 }
 
+function readPasswordResetToken() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const token = new URLSearchParams(window.location.search).get(PASSWORD_RESET_QUERY_KEY);
+  return token && token.trim().length > 0 ? token.trim() : null;
+}
+
+function replacePasswordResetToken(token: string | null) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  if (token) {
+    url.searchParams.set(PASSWORD_RESET_QUERY_KEY, token);
+  } else {
+    url.searchParams.delete(PASSWORD_RESET_QUERY_KEY);
+  }
+
+  window.history.replaceState({}, "", url.toString());
+}
+
 function loadPersistedWorkspace(userId: string): PersistedWorkspace | null {
   if (typeof window === "undefined") {
     return null;
@@ -311,6 +338,9 @@ export default function App() {
   const [auth, setAuth] = useState<AuthSession | null>(persistedAuth);
   const [authLoading, setAuthLoading] = useState(Boolean(persistedAuth));
   const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [passwordResetToken, setPasswordResetToken] = useState<string | null>(() =>
+    readPasswordResetToken(),
+  );
   const [documents, setDocuments] = useState<AppDocument[]>([]);
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState("");
@@ -364,6 +394,11 @@ export default function App() {
     setLoading(false);
     setUploading(false);
     setAuthLoading(false);
+  };
+
+  const clearPasswordResetToken = () => {
+    setPasswordResetToken(null);
+    replacePasswordResetToken(null);
   };
 
   const handleUnauthorized = (error: unknown) => {
@@ -1070,6 +1105,30 @@ export default function App() {
       setAuth(mapAuthSession(response));
       setAuthLoading(true);
       setInput("");
+      clearPasswordResetToken();
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  const handlePasswordResetRequest = async (email: string) => {
+    setAuthSubmitting(true);
+
+    try {
+      return await requestPasswordReset({ email });
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  const handlePasswordResetConfirm = async (payload: {
+    token: string;
+    password: string;
+  }) => {
+    setAuthSubmitting(true);
+
+    try {
+      return await confirmPasswordReset(payload);
     } finally {
       setAuthSubmitting(false);
     }
@@ -1090,7 +1149,16 @@ export default function App() {
   const currentUser = auth?.user;
 
   if (!isAuthenticated) {
-    return <AuthScreen loading={authSubmitting} onSubmit={handleAuthSubmit} />;
+    return (
+      <AuthScreen
+        loading={authSubmitting}
+        passwordResetToken={passwordResetToken}
+        onSubmit={handleAuthSubmit}
+        onRequestPasswordReset={handlePasswordResetRequest}
+        onConfirmPasswordReset={handlePasswordResetConfirm}
+        onClearPasswordResetToken={clearPasswordResetToken}
+      />
+    );
   }
 
   if (authLoading || !activeChat || !currentUser) {

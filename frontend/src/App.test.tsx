@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./components/PdfModal", () => ({
   default: () => null,
@@ -38,6 +38,10 @@ import App from "./App";
 
 const AUTH_STORAGE_KEY = "studyiacopilot.auth.v1";
 const WORKSPACE_STORAGE_KEY = "studyiacopilot.workspace.v3.user-1";
+
+afterEach(() => {
+  window.history.replaceState({}, "", "/");
+});
 
 function jsonResponse(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
@@ -575,5 +579,73 @@ describe("App", () => {
 
     expect(await screen.findByText("Research Plan.pdf")).toBeInTheDocument();
     expect(screen.getByText(/Charles Study/i)).toBeInTheDocument();
+  });
+
+  it("requests a password reset email from the sign-in screen", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url.endsWith("/api/auth/password-reset/request") && method === "POST") {
+        const body = JSON.parse(String(init?.body));
+        expect(body.email).toBe("charles@example.com");
+
+        return jsonResponse({
+          sent: true,
+          message: "Recovery link sent.",
+        });
+      }
+
+      throw new Error(`Unhandled request: ${method} ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Forgot password?" }));
+    await user.type(screen.getByLabelText("Email"), "charles@example.com");
+    await user.click(screen.getByRole("button", { name: "Send reset link" }));
+
+    expect(await screen.findByText("Recovery link sent.")).toBeInTheDocument();
+  });
+
+  it("opens the reset-password form from the URL token and updates the password", async () => {
+    window.history.replaceState({}, "", "/?reset_password_token=reset-token-123");
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url.endsWith("/api/auth/password-reset/confirm") && method === "POST") {
+        const body = JSON.parse(String(init?.body));
+        expect(body).toEqual({
+          token: "reset-token-123",
+          password: "new-password-456",
+        });
+
+        return jsonResponse({
+          password_reset: true,
+          message: "Password updated. You can sign in now.",
+        });
+      }
+
+      throw new Error(`Unhandled request: ${method} ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(screen.getByText("Choose a new password")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("New password"), "new-password-456");
+    await user.type(screen.getByLabelText("Confirm new password"), "new-password-456");
+    await user.click(screen.getByRole("button", { name: "Update password" }));
+
+    expect(await screen.findByText("Password updated. You can sign in now.")).toBeInTheDocument();
+    expect(window.location.search).toBe("");
   });
 });

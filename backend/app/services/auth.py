@@ -5,6 +5,7 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
+from app.config import PASSWORD_RESET_TOKEN_TTL_MINUTES
 
 PASSWORD_HASH_ITERATIONS = 390000
 SESSION_TTL_DAYS = int(os.getenv("AUTH_SESSION_TTL_DAYS", "30"))
@@ -62,12 +63,20 @@ def generate_session_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def generate_password_reset_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
 def hash_session_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def build_session_expiration() -> datetime:
     return utcnow() + timedelta(days=SESSION_TTL_DAYS)
+
+
+def build_password_reset_expiration() -> datetime:
+    return utcnow() + timedelta(minutes=PASSWORD_RESET_TOKEN_TTL_MINUTES)
 
 
 def is_session_expired(expires_at: datetime | None) -> bool:

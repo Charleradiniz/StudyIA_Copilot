@@ -20,6 +20,14 @@ def load_env_file(env_path: Path) -> None:
             os.environ.setdefault(key, value)
 
 
+def get_bool_env(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 PROJECT_DIR = BASE_DIR.parent
 load_env_file(BASE_DIR / ".env")
@@ -31,6 +39,23 @@ DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_SQLITE_URL)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
 RAG_MODE = os.getenv("RAG_MODE", "full").strip().lower()
+APP_NAME = os.getenv("APP_NAME", "StudyIA Copilot")
+PASSWORD_RESET_TOKEN_TTL_MINUTES = int(
+    os.getenv("PASSWORD_RESET_TOKEN_TTL_MINUTES", "60")
+)
+PASSWORD_RESET_URL_TEMPLATE = os.getenv(
+    "PASSWORD_RESET_URL_TEMPLATE",
+    "http://127.0.0.1:5173/?reset_password_token={token}",
+)
+
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "").strip()
+SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", APP_NAME).strip()
+SMTP_USE_TLS = get_bool_env("SMTP_USE_TLS", True)
+SMTP_USE_SSL = get_bool_env("SMTP_USE_SSL", False)
 
 raw_cors_origins = os.getenv(
     "CORS_ORIGINS",

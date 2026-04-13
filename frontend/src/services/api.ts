@@ -34,6 +34,16 @@ export type AuthMeResponse = {
   user: ApiUserResponse;
 };
 
+export type PasswordResetRequestResponse = {
+  sent: boolean;
+  message: string;
+};
+
+export type PasswordResetConfirmResponse = {
+  password_reset: boolean;
+  message: string;
+};
+
 export type UploadPdfResponse = {
   doc_id: string;
   name: string;
@@ -179,6 +189,33 @@ export async function logoutUser() {
   });
 
   return parseResponse<{ logged_out: boolean }>(res);
+}
+
+export async function requestPasswordReset(payload: { email: string }) {
+  const res = await apiFetch("/api/auth/password-reset/request", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<PasswordResetRequestResponse>(res);
+}
+
+export async function confirmPasswordReset(payload: {
+  token: string;
+  password: string;
+}) {
+  const res = await apiFetch("/api/auth/password-reset/confirm", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<PasswordResetConfirmResponse>(res);
 }
 
 export async function uploadPdf(file: File) {

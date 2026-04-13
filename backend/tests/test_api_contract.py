@@ -4,6 +4,7 @@ import json
 import shutil
 import unittest
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 import fitz
@@ -76,6 +77,7 @@ class ApiContractTests(unittest.TestCase):
             "system_reranker_model": system_route.reranker_model,
             "system_faiss_module": system_route.faiss_module,
             "generate_answer": query_module.generate_answer,
+            "send_password_reset_email": auth_route.send_password_reset_email,
         }
 
         db_module.configure_database("sqlite://")
@@ -93,6 +95,7 @@ class ApiContractTests(unittest.TestCase):
         system_route.reranker_model = None
         system_route.faiss_module = None
         self.llm_calls: list[dict] = []
+        self.password_reset_emails: list[dict] = []
 
         def fake_generate_answer(question, context, history=None, **kwargs):
             self.llm_calls.append({
@@ -103,7 +106,17 @@ class ApiContractTests(unittest.TestCase):
             })
             return "Mocked grounded answer."
 
+        def fake_send_password_reset_email(**kwargs):
+            token = kwargs["reset_token"]
+            reset_url = f"http://127.0.0.1:5173/?reset_password_token={token}"
+            self.password_reset_emails.append({
+                **kwargs,
+                "reset_url": reset_url,
+            })
+            return reset_url
+
         query_module.generate_answer = fake_generate_answer
+        auth_route.send_password_reset_email = fake_send_password_reset_email
         query_module.DOCUMENTS.clear()
 
         self.client = TestClient(build_test_app())
@@ -122,6 +135,7 @@ class ApiContractTests(unittest.TestCase):
         system_route.reranker_model = self.originals["system_reranker_model"]
         system_route.faiss_module = self.originals["system_faiss_module"]
         query_module.generate_answer = self.originals["generate_answer"]
+        auth_route.send_password_reset_email = self.originals["send_password_reset_email"]
         db_module.configure_database(self.originals["database_url"])
         shutil.rmtree(self.root_path, ignore_errors=True)
 
@@ -238,6 +252,64 @@ class ApiContractTests(unittest.TestCase):
         )
         self.assertEqual(me_response.status_code, 200, me_response.text)
         self.assertEqual(me_response.json()["user"]["full_name"], "Charles Study")
+
+    def test_password_reset_email_flow_updates_the_login_password(self) -> None:
+        auth = self.register_user()
+        old_token = auth["token"]
+
+        request_response = self.client.post(
+            "/api/auth/password-reset/request",
+            json={"email": "charles@example.com"},
+        )
+
+        self.assertEqual(request_response.status_code, 200, request_response.text)
+        self.assertEqual(len(self.password_reset_emails), 1)
+        self.assertEqual(
+            self.password_reset_emails[0]["recipient_email"],
+            "charles@example.com",
+        )
+
+        reset_url = self.password_reset_emails[0]["reset_url"]
+        token = parse_qs(urlparse(reset_url).query)["reset_password_token"][0]
+
+        confirm_response = self.client.post(
+            "/api/auth/password-reset/confirm",
+            json={
+                "token": token,
+                "password": "new-password-456",
+            },
+        )
+
+        self.assertEqual(confirm_response.status_code, 200, confirm_response.text)
+        self.assertTrue(confirm_response.json()["password_reset"])
+
+        old_me_response = self.client.get(
+            "/api/auth/me",
+            headers=self.auth_headers(old_token),
+        )
+        self.assertEqual(old_me_response.status_code, 401)
+
+        old_login_response = self.client.post(
+            "/api/auth/login",
+            json={
+                "email": "charles@example.com",
+                "password": "password123",
+            },
+        )
+        self.assertEqual(old_login_response.status_code, 401, old_login_response.text)
+
+        new_login_response = self.client.post(
+            "/api/auth/login",
+            json={
+                "email": "charles@example.com",
+                "password": "new-password-456",
+            },
+        )
+        self.assertEqual(new_login_response.status_code, 200, new_login_response.text)
+        self.assertEqual(
+            new_login_response.json()["user"]["email"],
+            "charles@example.com",
+        )
 
     def test_prompt_instructions_encourage_more_developed_answers(self) -> None:
         prompt = llm_module.build_prompt(
