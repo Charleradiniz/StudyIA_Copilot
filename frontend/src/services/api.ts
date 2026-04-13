@@ -1,5 +1,5 @@
 export const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-const API_REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
+const API_REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 65000);
 
 let authToken: string | null = null;
 
@@ -167,7 +167,7 @@ async function apiFetch(path: string, init?: RequestInit) {
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new ApiError(
-        "The server took too long to respond. Check your connection and try again.",
+        "The server is taking too long to respond. If the hosted backend is waking up, wait a moment and try again.",
         0,
       );
     }
