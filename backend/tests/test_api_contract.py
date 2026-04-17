@@ -606,6 +606,50 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(status["documents_indexed"], 1)
         self.assertTrue(status["workspace_data_available"])
 
+    def test_upload_succeeds_when_document_registry_write_fails(self) -> None:
+        self.register_user()
+        original_upsert = upload_route.upsert_document_record
+
+        def fail_document_registry_write(*args, **kwargs):
+            raise RuntimeError("document registry unavailable")
+
+        upload_route.upsert_document_record = fail_document_registry_write
+        try:
+            upload_payload = self.upload_sample_pdf(filename="registry-fallback.pdf")
+        finally:
+            upload_route.upsert_document_record = original_upsert
+
+        self.assertEqual(upload_payload["name"], "registry-fallback.pdf")
+
+        documents_response = self.client.get("/api/documents")
+        self.assertEqual(documents_response.status_code, 200, documents_response.text)
+        self.assertEqual(len(documents_response.json()["documents"]), 1)
+        self.assertEqual(documents_response.json()["documents"][0]["doc_id"], upload_payload["doc_id"])
+
+    def test_documents_endpoint_falls_back_when_document_registry_read_fails(self) -> None:
+        auth = self.register_user()
+        self.save_document_fixture(
+            user_id=auth["user"]["id"],
+            doc_id="registry-read-fallback",
+            filename="registry-read-fallback.pdf",
+            texts=[LONG_TEXT],
+        )
+        original_list_document_records = system_route.list_document_records
+
+        def fail_document_registry_read(*args, **kwargs):
+            raise RuntimeError("document registry unavailable")
+
+        system_route.list_document_records = fail_document_registry_read
+        try:
+            response = self.client.get("/api/documents")
+        finally:
+            system_route.list_document_records = original_list_document_records
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()["documents"]
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["doc_id"], "registry-read-fallback")
+
     def test_pdf_endpoint_serves_uploaded_document(self) -> None:
         self.register_user()
         upload_payload = self.upload_sample_pdf(filename="viewer-proof.pdf")
@@ -614,6 +658,23 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(pdf_response.status_code, 200)
         self.assertEqual(pdf_response.headers["content-type"], "application/pdf")
         self.assertGreater(len(pdf_response.content), 100)
+
+    def test_pdf_endpoint_works_when_document_registry_read_fails(self) -> None:
+        self.register_user()
+        upload_payload = self.upload_sample_pdf(filename="viewer-proof-fallback.pdf")
+        original_get_document_record = pdf_route.get_document_record
+
+        def fail_document_registry_read(*args, **kwargs):
+            raise RuntimeError("document registry unavailable")
+
+        pdf_route.get_document_record = fail_document_registry_read
+        try:
+            pdf_response = self.client.get(f"/api/pdf/{upload_payload['doc_id']}")
+        finally:
+            pdf_route.get_document_record = original_get_document_record
+
+        self.assertEqual(pdf_response.status_code, 200, pdf_response.text)
+        self.assertEqual(pdf_response.headers["content-type"], "application/pdf")
 
     def test_uploaded_documents_restore_after_runtime_cache_reset(self) -> None:
         self.register_user()

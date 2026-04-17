@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -8,6 +10,19 @@ from app.services.document_registry import get_document_record
 from app.services.storage import load_document, resolve_upload_path
 
 router = APIRouter()
+logger = logging.getLogger("studyiacopilot.pdf")
+
+
+def load_document_record_safe(db: Session, user_id: str, doc_id: str):
+    try:
+        return get_document_record(db, user_id, doc_id)
+    except Exception:
+        logger.exception(
+            "document_registry_read_failed user_id=%s doc_id=%s",
+            user_id,
+            doc_id,
+        )
+        return None
 
 
 @router.get("/pdf/{file_id}")
@@ -18,7 +33,7 @@ def get_pdf(
 ):
     normalized_file_id = file_id.replace(".pdf", "").strip()
     loaded = load_document(normalized_file_id, current_user.id, load_index=False)
-    document_record = get_document_record(db, current_user.id, normalized_file_id)
+    document_record = load_document_record_safe(db, current_user.id, normalized_file_id)
     if not loaded:
         if not document_record or not document_record.storage_path:
             raise HTTPException(

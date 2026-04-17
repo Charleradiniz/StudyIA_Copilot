@@ -210,23 +210,33 @@ async def upload_pdf(
             user_id=current_user.id,
         )
 
-        upsert_document_record(
-            db,
-            doc_id=doc_id,
-            user_id=current_user.id,
-            filename=metadata["filename"],
-            storage_provider=metadata["storage_provider"],
-            storage_path=file_path,
-            faiss_path=saved_paths.get("faiss_path"),
-            json_path=saved_paths.get("json_path"),
-            byte_size=os.path.getsize(file_path),
-            chunk_count=metadata["chunk_count"],
-            page_count=metadata["page_count"],
-            rag_mode=metadata["rag_mode"],
-            vector_ready=metadata["vector_ready"],
-            preview=metadata["preview"],
-            uploaded_at=metadata["uploaded_at"],
-        )
+        try:
+            upsert_document_record(
+                db,
+                doc_id=doc_id,
+                user_id=current_user.id,
+                filename=metadata["filename"],
+                storage_provider=metadata["storage_provider"],
+                storage_path=file_path,
+                faiss_path=saved_paths.get("faiss_path"),
+                json_path=saved_paths.get("json_path"),
+                byte_size=os.path.getsize(file_path),
+                chunk_count=metadata["chunk_count"],
+                page_count=metadata["page_count"],
+                rag_mode=metadata["rag_mode"],
+                vector_ready=metadata["vector_ready"],
+                preview=metadata["preview"],
+                uploaded_at=metadata["uploaded_at"],
+            )
+        except Exception:
+            # Keep the upload successful even when the persistent registry schema
+            # is missing or temporarily unavailable in production.
+            logger.exception(
+                "document_registry_write_failed user_id=%s doc_id=%s filename=%s",
+                current_user.id,
+                doc_id,
+                original_name,
+            )
 
         return build_upload_response(metadata)
 

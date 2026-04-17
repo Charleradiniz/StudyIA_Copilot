@@ -1,4 +1,5 @@
 import os
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -24,11 +25,46 @@ from app.services.storage import (
 )
 
 router = APIRouter()
+logger = logging.getLogger("studyiacopilot.system")
 
 
 def evict_document_cache(user_id: str, doc_id: str) -> None:
     for candidate in iter_doc_id_candidates(doc_id):
         DOCUMENTS.pop(get_document_cache_key(user_id, candidate), None)
+
+
+def list_document_records_safe(db: Session, user_id: str):
+    try:
+        return list_document_records(db, user_id)
+    except Exception:
+        logger.exception(
+            "document_registry_list_failed user_id=%s",
+            user_id,
+        )
+        return []
+
+
+def get_document_record_safe(db: Session, user_id: str, doc_id: str):
+    try:
+        return get_document_record(db, user_id, doc_id)
+    except Exception:
+        logger.exception(
+            "document_registry_read_failed user_id=%s doc_id=%s",
+            user_id,
+            doc_id,
+        )
+        return None
+
+
+def mark_document_deleted_safe(db: Session, user_id: str, doc_id: str) -> None:
+    try:
+        mark_document_deleted(db, user_id, doc_id)
+    except Exception:
+        logger.exception(
+            "document_registry_delete_failed user_id=%s doc_id=%s",
+            user_id,
+            doc_id,
+        )
 
 
 def serialize_document(record: dict, user_id: str, document_record=None) -> dict:
@@ -97,7 +133,7 @@ def list_documents(
 ):
     document_records = {
         record.id: record
-        for record in list_document_records(db, current_user.id)
+        for record in list_document_records_safe(db, current_user.id)
     }
     saved_documents = {
         record["doc_id"]: serialize_document(
@@ -166,7 +202,7 @@ def get_document_details(
     return serialize_document(
         payload,
         current_user.id,
-        get_document_record(db, current_user.id, doc_id),
+        get_document_record_safe(db, current_user.id, doc_id),
     )
 
 
@@ -181,7 +217,7 @@ def delete_document_entry(
         raise HTTPException(status_code=404, detail="Document not found.")
 
     evict_document_cache(current_user.id, deleted["doc_id"])
-    mark_document_deleted(db, current_user.id, deleted["doc_id"])
+    mark_document_deleted_safe(db, current_user.id, deleted["doc_id"])
 
     return {
         "doc_id": deleted["doc_id"],
@@ -199,7 +235,7 @@ def clear_document_library(
 
     for deleted in deleted_documents:
         evict_document_cache(current_user.id, deleted["doc_id"])
-        mark_document_deleted(db, current_user.id, deleted["doc_id"])
+        mark_document_deleted_safe(db, current_user.id, deleted["doc_id"])
 
     return {
         "removed_count": len(deleted_documents),
