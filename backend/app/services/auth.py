@@ -1,14 +1,13 @@
 import base64
 import hashlib
 import hmac
-import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from app.config import PASSWORD_RESET_TOKEN_TTL_MINUTES
+from app.config import AUTH_SESSION_TTL_DAYS, PASSWORD_RESET_TOKEN_TTL_MINUTES
 
 PASSWORD_HASH_ITERATIONS = 390000
-SESSION_TTL_DAYS = int(os.getenv("AUTH_SESSION_TTL_DAYS", "30"))
+SESSION_TTL_DAYS = AUTH_SESSION_TTL_DAYS
 
 
 def utcnow() -> datetime:

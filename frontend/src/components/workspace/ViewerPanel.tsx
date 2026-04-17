@@ -1,12 +1,13 @@
 import { Suspense, lazy } from "react";
 import type { AppDocument, Source } from "../../app/types";
+import type { PdfRequestSource } from "../../services/api";
 
 const PdfViewer = lazy(() => import("../PdfViewer"));
 
 type Props = {
   activeDocuments: AppDocument[];
   focusToken: number;
-  pdfUrl: string;
+  pdfRequest: PdfRequestSource | null;
   selectedSource: Source | null;
   viewerDocId: string | null;
   onSelectViewerDoc: (docId: string) => void;
@@ -16,7 +17,7 @@ type Props = {
 export default function ViewerPanel({
   activeDocuments,
   focusToken,
-  pdfUrl,
+  pdfRequest,
   selectedSource,
   viewerDocId,
   onSelectViewerDoc,
@@ -82,7 +83,7 @@ export default function ViewerPanel({
       <div className="min-h-0 flex-1 overflow-hidden p-4">
         <div className="h-full overflow-hidden rounded-[28px] border border-white/10 bg-[var(--panel)] shadow-[0_30px_90px_-48px_rgba(15,23,42,0.9)]">
           {viewerDocument ? (
-            viewerPdfAvailable ? (
+            viewerPdfAvailable && pdfRequest ? (
             <Suspense
               fallback={
                 <div className="flex h-full items-center justify-center text-sm text-[var(--muted-foreground)]">
@@ -91,8 +92,8 @@ export default function ViewerPanel({
               }
             >
               <PdfViewer
-                key={pdfUrl}
-                fileUrl={pdfUrl}
+                key={pdfRequest.url}
+                fileRequest={pdfRequest}
                 targetChunk={selectedSource?.chunk_id}
                 highlight={selectedSource ?? undefined}
                 focusToken={focusToken}

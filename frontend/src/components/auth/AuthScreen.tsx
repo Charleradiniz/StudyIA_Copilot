@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 
 type AuthMode = "login" | "register" | "forgot" | "reset";
 
@@ -27,26 +27,17 @@ export default function AuthScreen({
   onConfirmPasswordReset,
   onClearPasswordResetToken,
 }: Props) {
-  const [mode, setMode] = useState<AuthMode>(passwordResetToken ? "reset" : "login");
+  const [manualMode, setManualMode] = useState<AuthMode>("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
-  useEffect(() => {
-    if (passwordResetToken) {
-      setMode("reset");
-      setError("");
-      return;
-    }
-
-    setMode((currentMode) => (currentMode === "reset" ? "login" : currentMode));
-  }, [passwordResetToken]);
+  const mode: AuthMode = passwordResetToken ? "reset" : manualMode;
 
   const switchMode = (nextMode: AuthMode) => {
-    setMode(nextMode);
+    setManualMode(nextMode);
     setError("");
     setSuccess("");
   };
@@ -111,7 +102,7 @@ export default function AuthScreen({
           response?.message ??
             "Password updated. You can sign in with the new password now.",
         );
-        setMode("login");
+        setManualMode("login");
       } catch (submitError) {
         setError(
           submitError instanceof Error

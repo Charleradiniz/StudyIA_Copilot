@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.config import AUTH_SESSION_COOKIE_NAME
 from app.db import database
 from app.models.auth_session import AuthSession
 from app.models.user import User
@@ -25,11 +26,9 @@ def get_current_session(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db=Depends(get_db),
 ):
-    raw_token = None
-    if credentials is not None and credentials.scheme.lower() == "bearer":
+    raw_token = (request.cookies.get(AUTH_SESSION_COOKIE_NAME) or "").strip() or None
+    if not raw_token and credentials is not None and credentials.scheme.lower() == "bearer":
         raw_token = credentials.credentials
-    elif request.query_params.get("token"):
-        raw_token = request.query_params["token"]
 
     if not raw_token:
         raise HTTPException(

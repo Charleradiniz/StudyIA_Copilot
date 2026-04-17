@@ -15,11 +15,13 @@ os.environ["RAG_MODE"] = "lite"
 os.environ["GEMINI_API_KEY"] = ""
 
 from app.db import database as db_module
+from app.db.migrations import run_database_migrations
 from app.routes import auth as auth_route
 from app.routes import chats as chats_route
 from app.routes import pdf as pdf_route
 from app.routes import system as system_route
 from app.routes import upload as upload_route
+from app.services import email as email_module
 from app.services import llm as llm_module
 from app.services import query as query_module
 from app.services import storage as storage_module
@@ -80,10 +82,11 @@ class ApiContractTests(unittest.TestCase):
             "system_faiss_module": system_route.faiss_module,
             "generate_answer": query_module.generate_answer,
             "send_password_reset_email": auth_route.send_password_reset_email,
+            "password_reset_url_template": email_module.PASSWORD_RESET_URL_TEMPLATE,
         }
 
         db_module.configure_database("sqlite://")
-        db_module.Base.metadata.create_all(bind=db_module.engine)
+        run_database_migrations("sqlite://")
         upload_route.RAG_MODE = "lite"
         query_module.RAG_MODE = "lite"
         storage_module.DATA_ROOT = self.data_path
@@ -124,6 +127,11 @@ class ApiContractTests(unittest.TestCase):
         self.client = TestClient(build_test_app())
         self.addCleanup(self.client.close)
 
+    def create_client(self) -> TestClient:
+        client = TestClient(build_test_app())
+        self.addCleanup(client.close)
+        return client
+
     def tearDown(self) -> None:
         query_module.DOCUMENTS.clear()
         upload_route.RAG_MODE = self.originals["upload_rag_mode"]
@@ -138,18 +146,20 @@ class ApiContractTests(unittest.TestCase):
         system_route.faiss_module = self.originals["system_faiss_module"]
         query_module.generate_answer = self.originals["generate_answer"]
         auth_route.send_password_reset_email = self.originals["send_password_reset_email"]
+        email_module.PASSWORD_RESET_URL_TEMPLATE = self.originals["password_reset_url_template"]
         db_module.configure_database(self.originals["database_url"])
         shutil.rmtree(self.root_path, ignore_errors=True)
 
     def upload_sample_pdf(
         self,
-        headers: dict[str, str],
+        *,
+        client: TestClient | None = None,
         filename: str = "study-guide.pdf",
         text: str = LONG_TEXT,
     ) -> dict:
-        response = self.client.post(
+        test_client = client or self.client
+        response = test_client.post(
             "/api/upload",
-            headers=headers,
             files={
                 "file": (
                     filename,
@@ -165,11 +175,13 @@ class ApiContractTests(unittest.TestCase):
     def register_user(
         self,
         *,
+        client: TestClient | None = None,
         full_name: str = "Charles Study",
         email: str = "charles@example.com",
         password: str = "password123",
     ) -> dict:
-        response = self.client.post(
+        test_client = client or self.client
+        response = test_client.post(
             "/api/auth/register",
             json={
                 "full_name": full_name,
@@ -180,11 +192,10 @@ class ApiContractTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
-        self.assertIn("token", payload)
+        self.assertNotIn("token", payload)
+        self.assertIn("expires_at", payload)
+        self.assertIn("HttpOnly", response.headers.get("set-cookie", ""))
         return payload
-
-    def auth_headers(self, token: str) -> dict[str, str]:
-        return {"Authorization": f"Bearer {token}"}
 
     def save_document_fixture(
         self,
@@ -245,19 +256,36 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(login_response.status_code, 200, login_response.text)
         login_payload = login_response.json()
 
-        self.assertIn("token", register_payload)
+        self.assertIn("expires_at", register_payload)
         self.assertEqual(login_payload["user"]["email"], "charles@example.com")
+        self.assertIn("HttpOnly", login_response.headers.get("set-cookie", ""))
 
-        me_response = self.client.get(
-            "/api/auth/me",
-            headers=self.auth_headers(login_payload["token"]),
-        )
+        me_response = self.client.get("/api/auth/me")
         self.assertEqual(me_response.status_code, 200, me_response.text)
         self.assertEqual(me_response.json()["user"]["full_name"], "Charles Study")
+        self.assertIn("expires_at", me_response.json())
+
+    def test_logout_clears_the_session_cookie(self) -> None:
+        self.register_user()
+
+        me_response = self.client.get("/api/auth/me")
+        self.assertEqual(me_response.status_code, 200, me_response.text)
+
+        logout_response = self.client.post("/api/auth/logout")
+        self.assertEqual(logout_response.status_code, 200, logout_response.text)
+        self.assertIn("Max-Age=0", logout_response.headers.get("set-cookie", ""))
+
+        post_logout_me_response = self.client.get("/api/auth/me")
+        self.assertEqual(post_logout_me_response.status_code, 401)
+
+    def test_password_reset_url_requires_explicit_server_configuration(self) -> None:
+        email_module.PASSWORD_RESET_URL_TEMPLATE = ""
+
+        with self.assertRaises(email_module.EmailConfigurationError):
+            email_module.build_password_reset_url("reset-token-123")
 
     def test_password_reset_email_flow_updates_the_login_password(self) -> None:
-        auth = self.register_user()
-        old_token = auth["token"]
+        self.register_user()
 
         request_response = self.client.post(
             "/api/auth/password-reset/request",
@@ -285,10 +313,7 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(confirm_response.status_code, 200, confirm_response.text)
         self.assertTrue(confirm_response.json()["password_reset"])
 
-        old_me_response = self.client.get(
-            "/api/auth/me",
-            headers=self.auth_headers(old_token),
-        )
+        old_me_response = self.client.get("/api/auth/me")
         self.assertEqual(old_me_response.status_code, 401)
 
         old_login_response = self.client.post(
@@ -315,7 +340,6 @@ class ApiContractTests(unittest.TestCase):
 
     def test_chat_history_syncs_across_sessions_for_the_same_user(self) -> None:
         auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
         chat_payload = {
             "id": "chat-shared",
             "title": "Shared Workspace History",
@@ -340,14 +364,14 @@ class ApiContractTests(unittest.TestCase):
 
         sync_response = self.client.post(
             "/api/chats/sync",
-            headers=headers,
             json={"chats": [chat_payload]},
         )
 
         self.assertEqual(sync_response.status_code, 200, sync_response.text)
         self.assertEqual(sync_response.json()["synced_chat_ids"], ["chat-shared"])
 
-        second_login_response = self.client.post(
+        second_client = self.create_client()
+        second_login_response = second_client.post(
             "/api/auth/login",
             json={
                 "email": "charles@example.com",
@@ -355,9 +379,8 @@ class ApiContractTests(unittest.TestCase):
             },
         )
         self.assertEqual(second_login_response.status_code, 200, second_login_response.text)
-        second_headers = self.auth_headers(second_login_response.json()["token"])
 
-        chats_response = self.client.get("/api/chats", headers=second_headers)
+        chats_response = second_client.get("/api/chats")
 
         self.assertEqual(chats_response.status_code, 200, chats_response.text)
         payload = chats_response.json()
@@ -373,8 +396,7 @@ class ApiContractTests(unittest.TestCase):
         )
 
     def test_deleted_chat_creates_a_tombstone_and_blocks_stale_resync(self) -> None:
-        auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
+        self.register_user()
         chat_payload = {
             "id": "chat-to-delete",
             "title": "Delete Me",
@@ -393,25 +415,23 @@ class ApiContractTests(unittest.TestCase):
 
         first_sync_response = self.client.post(
             "/api/chats/sync",
-            headers=headers,
             json={"chats": [chat_payload]},
         )
         self.assertEqual(first_sync_response.status_code, 200, first_sync_response.text)
 
-        delete_response = self.client.delete("/api/chats/chat-to-delete", headers=headers)
+        delete_response = self.client.delete("/api/chats/chat-to-delete")
         self.assertEqual(delete_response.status_code, 200, delete_response.text)
         self.assertTrue(delete_response.json()["deleted"])
 
         stale_sync_response = self.client.post(
             "/api/chats/sync",
-            headers=headers,
             json={"chats": [chat_payload]},
         )
         self.assertEqual(stale_sync_response.status_code, 200, stale_sync_response.text)
         self.assertEqual(stale_sync_response.json()["synced_chat_ids"], [])
         self.assertEqual(stale_sync_response.json()["skipped_chat_ids"], ["chat-to-delete"])
 
-        chats_response = self.client.get("/api/chats", headers=headers)
+        chats_response = self.client.get("/api/chats")
         self.assertEqual(chats_response.status_code, 200, chats_response.text)
         payload = chats_response.json()
 
@@ -434,7 +454,6 @@ class ApiContractTests(unittest.TestCase):
 
     def test_summary_query_prefers_representative_chunks_over_leading_noise(self) -> None:
         auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
         doc_id = "mixed-quality-doc"
         self.save_document_fixture(
             user_id=auth["user"]["id"],
@@ -452,7 +471,6 @@ class ApiContractTests(unittest.TestCase):
 
         ask_response = self.client.post(
             "/api/ask",
-            headers=headers,
             json={
                 "question": "Sobre o que trata o documento?",
                 "doc_id": doc_id,
@@ -471,7 +489,6 @@ class ApiContractTests(unittest.TestCase):
 
     def test_ask_returns_safe_message_for_low_quality_extraction(self) -> None:
         auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
         doc_id = "low-quality-doc"
         self.save_document_fixture(
             user_id=auth["user"]["id"],
@@ -486,7 +503,6 @@ class ApiContractTests(unittest.TestCase):
 
         ask_response = self.client.post(
             "/api/ask",
-            headers=headers,
             json={
                 "question": "Sobre o que trata o documento?",
                 "doc_id": doc_id,
@@ -497,7 +513,7 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(ask_response.status_code, 200, ask_response.text)
         payload = ask_response.json()
 
-        self.assertIn("texto extraído", payload["answer"])
+        self.assertIn("texto extraido", payload["answer"])
         self.assertEqual(payload["sources"], [])
         self.assertEqual(self.llm_calls, [])
 
@@ -523,7 +539,6 @@ class ApiContractTests(unittest.TestCase):
 
     def test_ask_backfills_context_and_sources_when_retrieval_is_sparse(self) -> None:
         auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
         doc_id = "deep-context-doc"
         self.save_document_fixture(
             user_id=auth["user"]["id"],
@@ -541,7 +556,6 @@ class ApiContractTests(unittest.TestCase):
 
         ask_response = self.client.post(
             "/api/ask",
-            headers=headers,
             json={
                 "question": "transit hubs",
                 "doc_id": doc_id,
@@ -561,9 +575,8 @@ class ApiContractTests(unittest.TestCase):
         self.assertIn("[Topic 1:", last_llm_call["context"])
 
     def test_upload_populates_catalog_and_runtime_status(self) -> None:
-        auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
-        upload_payload = self.upload_sample_pdf(headers=headers)
+        self.register_user()
+        upload_payload = self.upload_sample_pdf()
 
         self.assertEqual(upload_payload["name"], "study-guide.pdf")
         self.assertGreaterEqual(upload_payload["chunks"], 1)
@@ -572,7 +585,7 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(upload_payload["rag_mode"], "lite")
         self.assertTrue(upload_payload["pdf_available"])
 
-        documents_response = self.client.get("/api/documents", headers=headers)
+        documents_response = self.client.get("/api/documents")
         self.assertEqual(documents_response.status_code, 200)
         documents = documents_response.json()["documents"]
 
@@ -583,7 +596,7 @@ class ApiContractTests(unittest.TestCase):
         self.assertIn("StudyIA Copilot", documents[0]["preview"])
         self.assertTrue(documents[0]["pdf_available"])
 
-        status_response = self.client.get("/api/system/status", headers=headers)
+        status_response = self.client.get("/api/system/status")
         self.assertEqual(status_response.status_code, 200)
         status = status_response.json()
 
@@ -594,27 +607,73 @@ class ApiContractTests(unittest.TestCase):
         self.assertTrue(status["workspace_data_available"])
 
     def test_pdf_endpoint_serves_uploaded_document(self) -> None:
-        auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
-        upload_payload = self.upload_sample_pdf(headers=headers, filename="viewer-proof.pdf")
-
-        pdf_response = self.client.get(
-            f"/api/pdf/{upload_payload['doc_id']}",
-            headers=headers,
-        )
+        self.register_user()
+        upload_payload = self.upload_sample_pdf(filename="viewer-proof.pdf")
+        pdf_response = self.client.get(f"/api/pdf/{upload_payload['doc_id']}")
 
         self.assertEqual(pdf_response.status_code, 200)
         self.assertEqual(pdf_response.headers["content-type"], "application/pdf")
         self.assertGreater(len(pdf_response.content), 100)
 
-    def test_ask_returns_grounded_sources_for_uploaded_document(self) -> None:
-        auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
-        upload_payload = self.upload_sample_pdf(headers=headers)
+    def test_uploaded_documents_restore_after_runtime_cache_reset(self) -> None:
+        self.register_user()
+        upload_payload = self.upload_sample_pdf(filename="persistent-proof.pdf")
+        query_module.DOCUMENTS.clear()
+
+        documents_response = self.client.get("/api/documents")
+        self.assertEqual(documents_response.status_code, 200, documents_response.text)
+        self.assertEqual(len(documents_response.json()["documents"]), 1)
+
+        pdf_response = self.client.get(f"/api/pdf/{upload_payload['doc_id']}")
+        self.assertEqual(pdf_response.status_code, 200, pdf_response.text)
+        self.assertEqual(pdf_response.headers["content-type"], "application/pdf")
 
         ask_response = self.client.post(
             "/api/ask",
-            headers=headers,
+            json={
+                "question": "What title appears in the document?",
+                "doc_id": upload_payload["doc_id"],
+                "history": [],
+            },
+        )
+        self.assertEqual(ask_response.status_code, 200, ask_response.text)
+        self.assertGreaterEqual(len(ask_response.json()["sources"]), 1)
+
+    def test_authenticated_routes_do_not_accept_query_string_tokens(self) -> None:
+        self.register_user()
+        unauthenticated_client = self.create_client()
+
+        response = unauthenticated_client.get(
+            "/api/auth/me",
+            params={"token": "fake-token"},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["detail"], "Authentication required.")
+
+    def test_upload_rejects_non_pdf_payload_even_with_a_pdf_filename(self) -> None:
+        self.register_user()
+
+        response = self.client.post(
+            "/api/upload",
+            files={
+                "file": (
+                    "fake.pdf",
+                    io.BytesIO(b"not-a-real-pdf"),
+                    "application/pdf",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertEqual(response.json()["detail"], "The uploaded file is not a valid PDF.")
+
+    def test_ask_returns_grounded_sources_for_uploaded_document(self) -> None:
+        self.register_user()
+        upload_payload = self.upload_sample_pdf()
+
+        ask_response = self.client.post(
+            "/api/ask",
             json={
                 "question": "Qual é o foco principal do documento?",
                 "doc_id": upload_payload["doc_id"],
@@ -632,22 +691,18 @@ class ApiContractTests(unittest.TestCase):
         self.assertIn("StudyIA Copilot", payload["sources"][0]["text"])
 
     def test_ask_accepts_multiple_active_documents(self) -> None:
-        auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
+        self.register_user()
         first_upload = self.upload_sample_pdf(
-            headers=headers,
             filename="architecture.pdf",
             text=("Architecture evidence for multi PDF retrieval. " * 8),
         )
         second_upload = self.upload_sample_pdf(
-            headers=headers,
             filename="operations.pdf",
             text=("Operations evidence for multi PDF retrieval. " * 8),
         )
 
         ask_response = self.client.post(
             "/api/ask",
-            headers=headers,
             json={
                 "question": "Compare the active PDFs",
                 "doc_ids": [first_upload["doc_id"], second_upload["doc_id"]],
@@ -664,22 +719,18 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(returned_doc_ids, {first_upload["doc_id"], second_upload["doc_id"]})
 
     def test_ask_groups_context_by_document_for_comparison_questions(self) -> None:
-        auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
+        self.register_user()
         first_upload = self.upload_sample_pdf(
-            headers=headers,
             filename="greek-architecture.pdf",
             text=("Greek architecture relies on columns, pediments, and geometric proportion. " * 8),
         )
         second_upload = self.upload_sample_pdf(
-            headers=headers,
             filename="islamic-architecture.pdf",
             text=("Islamic architecture relies on courtyards, arches, and geometric ornament. " * 8),
         )
 
         ask_response = self.client.post(
             "/api/ask",
-            headers=headers,
             json={
                 "question": "Compare the similarities and differences between the documents.",
                 "doc_ids": [first_upload["doc_id"], second_upload["doc_id"]],
@@ -703,22 +754,18 @@ class ApiContractTests(unittest.TestCase):
         self.assertIn("Islamic Architecture", returned_labels)
 
     def test_ask_uses_cross_document_fallback_for_relational_questions(self) -> None:
-        auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
+        self.register_user()
         first_upload = self.upload_sample_pdf(
-            headers=headers,
             filename="civic-order.pdf",
             text=("Doric colonnades and stone pediments organize civic temples. " * 8),
         )
         second_upload = self.upload_sample_pdf(
-            headers=headers,
             filename="sacred-space.pdf",
             text=("Muqarnas vaults and interior courtyards organize sacred complexes. " * 8),
         )
 
         ask_response = self.client.post(
             "/api/ask",
-            headers=headers,
             json={
                 "question": "What is the relationship between the two documents?",
                 "doc_ids": [first_upload["doc_id"], second_upload["doc_id"]],
@@ -740,8 +787,7 @@ class ApiContractTests(unittest.TestCase):
 
     def test_delete_document_removes_assets_and_catalog_entry(self) -> None:
         auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
-        upload_payload = self.upload_sample_pdf(headers=headers, filename="cleanup-proof.pdf")
+        upload_payload = self.upload_sample_pdf(filename="cleanup-proof.pdf")
         doc_id = upload_payload["doc_id"]
         user_id = auth["user"]["id"]
         pdf_path = self.upload_path / user_id / f"{doc_id}.pdf"
@@ -750,7 +796,7 @@ class ApiContractTests(unittest.TestCase):
         self.assertTrue(pdf_path.exists())
         self.assertTrue(json_path.exists())
 
-        delete_response = self.client.delete(f"/api/documents/{doc_id}", headers=headers)
+        delete_response = self.client.delete(f"/api/documents/{doc_id}")
 
         self.assertEqual(delete_response.status_code, 200, delete_response.text)
         payload = delete_response.json()
@@ -763,20 +809,19 @@ class ApiContractTests(unittest.TestCase):
             query_module.DOCUMENTS,
         )
 
-        catalog_response = self.client.get("/api/documents", headers=headers)
+        catalog_response = self.client.get("/api/documents")
         self.assertEqual(catalog_response.status_code, 200)
         self.assertEqual(catalog_response.json()["documents"], [])
 
-        pdf_response = self.client.get(f"/api/pdf/{doc_id}", headers=headers)
+        pdf_response = self.client.get(f"/api/pdf/{doc_id}")
         self.assertEqual(pdf_response.status_code, 404)
 
     def test_clear_documents_endpoint_removes_all_uploaded_assets(self) -> None:
-        auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
-        first_upload = self.upload_sample_pdf(headers=headers, filename="first.pdf")
-        second_upload = self.upload_sample_pdf(headers=headers, filename="second.pdf")
+        self.register_user()
+        first_upload = self.upload_sample_pdf(filename="first.pdf")
+        second_upload = self.upload_sample_pdf(filename="second.pdf")
 
-        response = self.client.delete("/api/documents", headers=headers)
+        response = self.client.delete("/api/documents")
 
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
@@ -786,13 +831,12 @@ class ApiContractTests(unittest.TestCase):
             payload["removed_doc_ids"],
             [first_upload["doc_id"], second_upload["doc_id"]],
         )
-        catalog_response = self.client.get("/api/documents", headers=headers)
+        catalog_response = self.client.get("/api/documents")
         self.assertEqual(catalog_response.status_code, 200)
         self.assertEqual(catalog_response.json()["documents"], [])
 
     def test_documents_endpoint_supports_legacy_saved_payloads(self) -> None:
         auth = self.register_user()
-        headers = self.auth_headers(auth["token"])
         legacy_document = [
             {
                 "id": 0,
@@ -812,7 +856,7 @@ class ApiContractTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-        response = self.client.get("/api/documents", headers=headers)
+        response = self.client.get("/api/documents")
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()["documents"]
@@ -825,30 +869,30 @@ class ApiContractTests(unittest.TestCase):
         self.assertFalse(payload[0]["pdf_available"])
 
     def test_each_user_only_sees_their_own_documents(self) -> None:
+        first_client = self.create_client()
+        second_client = self.create_client()
         first_user = self.register_user(
+            client=first_client,
             full_name="User One",
             email="user-one@example.com",
         )
         second_user = self.register_user(
+            client=second_client,
             full_name="User Two",
             email="user-two@example.com",
         )
-        first_headers = self.auth_headers(first_user["token"])
-        second_headers = self.auth_headers(second_user["token"])
         first_upload = self.upload_sample_pdf(
-            headers=first_headers,
+            client=first_client,
             filename="tenant-safe.pdf",
         )
 
-        first_docs_response = self.client.get("/api/documents", headers=first_headers)
-        second_docs_response = self.client.get("/api/documents", headers=second_headers)
-        forbidden_pdf_response = self.client.get(
+        first_docs_response = first_client.get("/api/documents")
+        second_docs_response = second_client.get("/api/documents")
+        forbidden_pdf_response = second_client.get(
             f"/api/pdf/{first_upload['doc_id']}",
-            headers=second_headers,
         )
-        forbidden_ask_response = self.client.post(
+        forbidden_ask_response = second_client.post(
             "/api/ask",
-            headers=second_headers,
             json={
                 "question": "What does the hidden document say?",
                 "doc_id": first_upload["doc_id"],

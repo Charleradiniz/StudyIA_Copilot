@@ -1,8 +1,6 @@
 export const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 const API_REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 65000);
 
-let authToken: string | null = null;
-
 export class ApiError extends Error {
   status: number;
 
@@ -26,14 +24,11 @@ export type ApiUserResponse = {
 };
 
 export type AuthResponse = {
-  token: string;
   expires_at: string;
   user: ApiUserResponse;
 };
 
-export type AuthMeResponse = {
-  user: ApiUserResponse;
-};
+export type AuthMeResponse = AuthResponse;
 
 export type PasswordResetRequestResponse = {
   sent: boolean;
@@ -172,8 +167,9 @@ export type ClearChatsResponse = {
   deleted_chat_ids: string[];
 };
 
-export function setAuthToken(token: string | null) {
-  authToken = token;
+export type PdfRequestSource = {
+  url: string;
+  withCredentials?: boolean;
 }
 
 async function parseResponse<T>(res: Response): Promise<T> {
@@ -192,13 +188,7 @@ async function parseResponse<T>(res: Response): Promise<T> {
 }
 
 function createHeaders(headers?: HeadersInit) {
-  const nextHeaders = new Headers(headers);
-
-  if (authToken) {
-    nextHeaders.set("Authorization", `Bearer ${authToken}`);
-  }
-
-  return nextHeaders;
+  return new Headers(headers);
 }
 
 async function apiFetch(path: string, init?: RequestInit) {
@@ -222,6 +212,7 @@ async function apiFetch(path: string, init?: RequestInit) {
   try {
     return await fetch(`${API_URL}${path}`, {
       ...init,
+      credentials: "include",
       headers,
       signal: controller.signal,
     });
@@ -406,4 +397,11 @@ export async function clearDocuments() {
   });
 
   return parseResponse<ClearDocumentsResponse>(res);
+}
+
+export function buildPdfRequest(docId: string): PdfRequestSource {
+  return {
+    url: `${API_URL}/api/pdf/${encodeURIComponent(docId)}`,
+    withCredentials: true,
+  };
 }

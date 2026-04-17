@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect } from "react";
 import type { AppDocument } from "../app/types";
+import type { PdfRequestSource } from "../services/api";
 
 const PdfViewer = lazy(() => import("./PdfViewer"));
 
@@ -14,7 +15,7 @@ type Props = {
   activeDocuments: AppDocument[];
   open: boolean;
   onClose: () => void;
-  fileUrl: string;
+  fileRequest: PdfRequestSource | null;
   highlight?: Highlight | null;
   focusToken: number;
   viewerDocId: string | null;
@@ -25,13 +26,13 @@ export default function PdfModal({
   activeDocuments,
   open,
   onClose,
-  fileUrl,
+  fileRequest,
   highlight,
   focusToken,
   viewerDocId,
   onSelectViewerDoc,
 }: Props) {
-  const isValidUrl = fileUrl.trim().length > 0;
+  const isValidFileRequest = Boolean(fileRequest?.url);
   const viewerDocument =
     activeDocuments.find((document) => document.id === viewerDocId) ?? activeDocuments[0] ?? null;
 
@@ -103,7 +104,7 @@ export default function PdfModal({
         )}
 
         <div className="flex h-full w-full flex-1 overflow-hidden">
-          {isValidUrl ? (
+          {isValidFileRequest && fileRequest ? (
             <Suspense
               fallback={
                 <div className="flex h-full w-full items-center justify-center text-neutral-400">
@@ -112,8 +113,8 @@ export default function PdfModal({
               }
             >
               <PdfViewer
-                key={fileUrl}
-                fileUrl={fileUrl}
+                key={fileRequest.url}
+                fileRequest={fileRequest}
                 targetChunk={
                   typeof highlight?.chunk_id === "number"
                     ? highlight.chunk_id

@@ -21,8 +21,11 @@ This repository is meant to showcase more than a prompt wrapper:
 - conversational follow-up support with short-term chat history
 - grounded answers with clickable sources
 - PDF highlights in the original document viewer
-- frontend session persistence for chats and selected documents
-- backend-powered document catalog sync on frontend load
+- HttpOnly cookie authentication and explicit password-reset configuration
+- backend-powered document and chat sync across desktop and mobile sessions
+- persistent PDF storage plus a document registry for recovery after restarts
+- database migrations on startup
+- real full-stack browser coverage with the backend running for real
 - system readiness signals for LLM, embeddings, reranker, and retrieval mode
 - automated backend API contract tests for upload, ask, catalog, and PDF serving
 - observability logs for retrieval and generation timings
@@ -111,10 +114,18 @@ GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-2.5-flash-lite
 RAG_MODE=full
 LOG_LEVEL=INFO
+STORAGE_ROOT=./storage
+PDF_STORAGE_PROVIDER=local
+PDF_STORAGE_DIR=./storage/pdfs
+DATA_DIR=./storage/indexes
+AUTH_SESSION_TTL_DAYS=30
+AUTH_SESSION_COOKIE_NAME=studyiacopilot_session
+AUTH_SESSION_COOKIE_PATH=/
+AUTH_SESSION_COOKIE_SAMESITE=lax
+AUTH_SESSION_COOKIE_SECURE=false
 APP_NAME=StudyIA Copilot
 PASSWORD_RESET_TOKEN_TTL_MINUTES=60
-# Optional: if omitted, the backend uses the request origin for reset links
-PASSWORD_RESET_URL_TEMPLATE=
+PASSWORD_RESET_URL_TEMPLATE=http://127.0.0.1:5173/?reset_password_token={token}
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USERNAME=your_smtp_user
@@ -137,6 +148,8 @@ Start the backend:
 ```bash
 uvicorn app.main:app --reload
 ```
+
+The backend applies database migrations automatically on startup. If Alembic is not installed in the local environment, the app falls back to an idempotent baseline schema bootstrap so the project still starts cleanly for evaluation.
 
 ### 3. Frontend setup
 
@@ -174,6 +187,8 @@ Frontend quality checks:
 cd frontend
 npm run lint
 npm run build
+npm run test
+npm run test:e2e
 ```
 
 ## Observability
@@ -198,7 +213,7 @@ The current UI includes:
 - document cards with chunk count, page count, preview, and retrieval readiness
 - loading skeletons and streaming responses
 - mobile-friendly upload flow
-- local persistence of sessions with `localStorage` plus backend document catalog hydration
+- backend-sourced chat/document continuity across signed-in devices with local per-user workspace caching for UX resilience
 - password recovery by email with one-time reset links
 
 This makes the app feel closer to a production SaaS experience rather than a single-screen prototype.
@@ -228,10 +243,11 @@ That flow demonstrates:
 - The app separates a stronger local `full` mode from a cheaper public `lite` mode instead of deleting the advanced pipeline for deployment convenience.
 - PDF chunks keep positional metadata, which enables evidence highlighting instead of only plain-text citations.
 - Follow-up questions are contextualized with recent chat history so short prompts can still retrieve the right chunks.
-- The frontend persists sessions locally, which makes the product feel continuous across refreshes.
+- Authentication uses HttpOnly cookies so session tokens are not exposed to browser JavaScript.
+- The backend keeps chat history and document metadata as the source of truth, which makes cross-device continuity real instead of cosmetic.
 - Logs capture retrieval and generation timing, which is useful for latency analysis and debugging retrieval quality.
 - The backend exposes document catalog and runtime readiness endpoints so the UI can surface operational state instead of hiding infrastructure assumptions.
-- The repository includes API contract tests for the core user flow, which makes the project safer to evolve and easier to validate with confidence.
+- The repository includes API contract tests plus a real browser test against a live backend, which makes the project safer to evolve and easier to validate with confidence.
 
 ## Technical Strengths
 
@@ -241,15 +257,15 @@ What makes this repository stronger than a typical AI demo:
 - the frontend exposes technical system state in a user-friendly way, which helps both debugging and demo storytelling
 - the PDF viewer is integrated into the retrieval flow with direct evidence jumps and highlights
 - the core backend flow is covered by automated tests, not only manual demo steps
+- chat history and document availability now survive sign-in across multiple devices because the backend is the source of truth
 
 ## Current Gaps
 
 The project already has a strong foundation, but the next steps that would raise it to a much higher level are:
-- frontend component or e2e tests
 - structured evaluation for retrieval quality
-- session persistence in a real database
 - provider abstraction for Gemini and Ollama
 - richer analytics and monitoring dashboards
+- background jobs for async indexing on heavier deployments
 
 ## Deployment Notes
 
@@ -269,6 +285,15 @@ GEMINI_MODEL=gemini-2.5-flash-lite
 RAG_MODE=lite
 CORS_ORIGINS=https://your-frontend.vercel.app
 DATABASE_URL=your_database_url
+STORAGE_ROOT=/opt/render/project/src/storage
+PDF_STORAGE_PROVIDER=local
+PDF_STORAGE_DIR=/opt/render/project/src/storage/pdfs
+DATA_DIR=/opt/render/project/src/storage/indexes
+AUTH_SESSION_TTL_DAYS=30
+AUTH_SESSION_COOKIE_NAME=studyiacopilot_session
+AUTH_SESSION_COOKIE_PATH=/
+AUTH_SESSION_COOKIE_SAMESITE=none
+AUTH_SESSION_COOKIE_SECURE=true
 APP_NAME=StudyIA Copilot
 PASSWORD_RESET_TOKEN_TTL_MINUTES=60
 PASSWORD_RESET_URL_TEMPLATE=https://your-frontend.vercel.app/?reset_password_token={token}
@@ -284,8 +309,9 @@ SMTP_USE_SSL=false
 
 Important:
 - Set a persistent `DATABASE_URL` in production. If it is missing, the backend falls back to a local SQLite file inside the running instance, which can make user accounts and sessions disappear after redeploys.
+- Set persistent storage paths for PDFs and indexes. If deploy storage is ephemeral, uploaded files will disappear after instance replacement.
 - Password reset email only works after the SMTP variables above are configured in the production backend.
-- If `PASSWORD_RESET_URL_TEMPLATE` is omitted, the backend now falls back to the request origin when building the reset link.
+- `PASSWORD_RESET_URL_TEMPLATE` is required for password recovery because reset links are now built only from explicit server configuration.
 
 ### Vercel frontend
 

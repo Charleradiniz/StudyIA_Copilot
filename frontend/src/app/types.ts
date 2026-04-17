@@ -17,7 +17,6 @@ export type AppUser = {
 };
 
 export type AuthSession = {
-  token: string;
   expiresAt: number;
   user: AppUser;
 };

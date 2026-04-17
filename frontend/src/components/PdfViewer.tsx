@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
+import type { PdfRequestSource } from "../services/api";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -11,7 +12,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString();
 
 type Props = {
-  fileUrl: string;
+  fileRequest: PdfRequestSource;
   targetChunk?: number;
   focusToken: number;
   highlight?: {
@@ -26,7 +27,7 @@ type PageMetrics = {
   height: number;
 };
 
-export default function PdfViewer({ fileUrl, targetChunk, focusToken, highlight }: Props) {
+export default function PdfViewer({ fileRequest, targetChunk, focusToken, highlight }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const lastPageScrollKeyRef = useRef<string>("");
@@ -38,7 +39,8 @@ export default function PdfViewer({ fileUrl, targetChunk, focusToken, highlight 
   const [isLoading, setIsLoading] = useState(true);
   const [pageMetrics, setPageMetrics] = useState<Record<number, PageMetrics>>({});
   const [highlightElement, setHighlightElement] = useState<HTMLDivElement | null>(null);
-  const file = useMemo(() => ({ url: fileUrl }), [fileUrl]);
+  const file = useMemo(() => fileRequest, [fileRequest]);
+  const fileUrl = fileRequest.url;
 
   useEffect(() => {
     const container = containerRef.current;

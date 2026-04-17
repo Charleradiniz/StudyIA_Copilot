@@ -1,14 +1,15 @@
+import logging
 import os
-import shutil
 from datetime import datetime, timezone
-from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy.orm import Session
 
-from app.config import RAG_MODE
-from app.db.deps import get_current_user
+from app.config import PDF_STORAGE_PROVIDER, RAG_MODE
+from app.db.deps import get_current_user, get_db
 from app.models.user import User
+from app.services.document_registry import upsert_document_record
 from app.services.pdf_reader import extract_chunks_with_positions
 from app.services.embeddings import generate_embeddings
 from app.services.query import DOCUMENTS, get_document_cache_key
@@ -22,6 +23,9 @@ except Exception:
     np = None
 
 router = APIRouter()
+logger = logging.getLogger("studyiacopilot.upload")
+PDF_FILE_SIGNATURE = b"%PDF-"
+MAX_PDF_UPLOAD_BYTES = int(os.getenv("MAX_PDF_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 
 
 def create_faiss_index(embeddings):
@@ -31,7 +35,7 @@ def create_faiss_index(embeddings):
     embeddings_np = np.array(embeddings).astype("float32")
 
     if len(embeddings_np.shape) != 2:
-        raise ValueError("Embeddings inválidos")
+        raise ValueError("Invalid embedding payload.")
 
     dimension = embeddings_np.shape[1]
 
@@ -60,6 +64,7 @@ def build_document_metadata(
         "doc_id": doc_id,
         "user_id": user_id,
         "filename": original_name,
+        "storage_provider": PDF_STORAGE_PROVIDER,
         "path": file_path,
         "chunk_count": len(documents),
         "page_count": (max(page_numbers) + 1) if page_numbers else 0,
@@ -84,48 +89,76 @@ def build_upload_response(metadata: dict):
     }
 
 
+def validate_pdf_upload(file: UploadFile) -> None:
+    filename = (file.filename or "").strip()
+    if not filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are allowed.",
+        )
+
+    try:
+        signature = file.file.read(len(PDF_FILE_SIGNATURE))
+        file.file.seek(0)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not read the uploaded file.",
+        ) from exc
+
+    if signature != PDF_FILE_SIGNATURE:
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded file is not a valid PDF.",
+        )
+
+
+def persist_upload_file(source_file, destination_path: str) -> None:
+    bytes_written = 0
+
+    with open(destination_path, "wb") as buffer:
+        while True:
+            chunk = source_file.read(1024 * 1024)
+            if not chunk:
+                break
+
+            bytes_written += len(chunk)
+            if bytes_written > MAX_PDF_UPLOAD_BYTES:
+                raise HTTPException(
+                    status_code=413,
+                    detail=(
+                        "The PDF is too large. Upload files up to "
+                        f"{MAX_PDF_UPLOAD_BYTES // (1024 * 1024)} MB."
+                    ),
+                )
+
+            buffer.write(chunk)
+
+
 @router.post("/upload")
 async def upload_pdf(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     file_path = None
     try:
-        # =========================
-        # VALIDATION
-        # =========================
-        if not file.filename or not file.filename.lower().endswith(".pdf"):
-            raise HTTPException(
-                status_code=400,
-                detail="Apenas PDFs são permitidos"
-            )
+        validate_pdf_upload(file)
 
         doc_id = str(uuid4())
-        original_name = file.filename
+        original_name = file.filename or "document.pdf"
 
         upload_path = get_user_upload_path(current_user.id)
         file_path = str(upload_path / f"{doc_id}.pdf")
 
-        # =========================
-        # SAVE FILE
-        # =========================
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # =========================
-        # PDF EXTRACTION
-        # =========================
+        persist_upload_file(file.file, file_path)
         chunks = extract_chunks_with_positions(file_path)
 
         if not chunks:
             raise HTTPException(
                 status_code=422,
-                detail="O PDF não possui texto extraível para indexação.",
+                detail="The PDF does not contain extractable text for indexing.",
             )
-
-        # =========================
-        # DOCUMENT STRUCTURE
-        # =========================
         documents = [
             {
                 "text": chunk["text"],
@@ -169,12 +202,30 @@ async def upload_pdf(
             "metadata": metadata,
         }
 
-        save_document(
+        saved_paths = save_document(
             doc_id,
             documents,
             index,
             metadata=metadata,
             user_id=current_user.id,
+        )
+
+        upsert_document_record(
+            db,
+            doc_id=doc_id,
+            user_id=current_user.id,
+            filename=metadata["filename"],
+            storage_provider=metadata["storage_provider"],
+            storage_path=file_path,
+            faiss_path=saved_paths.get("faiss_path"),
+            json_path=saved_paths.get("json_path"),
+            byte_size=os.path.getsize(file_path),
+            chunk_count=metadata["chunk_count"],
+            page_count=metadata["page_count"],
+            rag_mode=metadata["rag_mode"],
+            vector_ready=metadata["vector_ready"],
+            preview=metadata["preview"],
+            uploaded_at=metadata["uploaded_at"],
         )
 
         return build_upload_response(metadata)
@@ -184,10 +235,15 @@ async def upload_pdf(
             os.remove(file_path)
         raise
 
-    except Exception as e:
+    except Exception as exc:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
+        logger.exception(
+            "upload_processing_failed user_id=%s filename=%s",
+            current_user.id,
+            getattr(file, "filename", None),
+        )
         raise HTTPException(
             status_code=500,
-            detail=str(e)
-        )
+            detail="The server could not process this PDF upload.",
+        ) from exc

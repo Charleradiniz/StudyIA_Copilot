@@ -1,10 +1,19 @@
-import { startTransition, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import { createAssistantMessage, createChat, createId } from "./app/chat-utils";
+import {
+  clearPersistedWorkspace,
+  mergeDocuments,
+  sortChats,
+} from "./app/workspace-utils";
 import type {
   AppDocument,
-  AppUser,
-  AuthSession,
-  ChatMessage,
   ChatSession,
   ConversationTurn,
   Source,
@@ -16,248 +25,23 @@ import PdfModal from "./components/PdfModal";
 import ChatWorkspace from "./components/workspace/ChatWorkspace";
 import SidebarPanel from "./components/workspace/SidebarPanel";
 import ViewerPanel from "./components/workspace/ViewerPanel";
+import { useAuthSession } from "./hooks/useAuthSession";
+import { useWorkspaceSync } from "./hooks/useWorkspaceSync";
 import {
-  API_URL,
-  ApiError,
   askQuestion,
+  buildPdfRequest,
   clearChatHistory,
   clearDocuments,
-  confirmPasswordReset,
   deleteChatHistory,
   deleteDocument,
-  getCurrentUser,
-  getSystemStatus,
-  listChats,
-  loginUser,
-  listDocuments,
-  logoutUser,
-  requestPasswordReset,
-  registerUser,
-  setAuthToken,
-  syncChats,
   uploadPdf,
-  type ApiUserResponse,
-  type AuthResponse,
-  type ChatResponse,
-  type DeletedChatResponse,
-  type DocumentSummaryResponse,
-  type SystemStatusResponse,
 } from "./services/api";
 
-const AUTH_STORAGE_KEY = "studyiacopilot.auth.v1";
-const WORKSPACE_STORAGE_PREFIX = "studyiacopilot.workspace.v3";
-const PASSWORD_RESET_QUERY_KEY = "reset_password_token";
-
-type PersistedWorkspace = {
-  chats: ChatSession[];
-  activeChatId: string;
-  activeNav: WorkspaceNav;
-  viewerDocId: string | null;
-};
-
-type DeletedChatTombstone = {
-  id: string;
-  deletedAt: number;
-};
-
-function toTimestamp(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const parsed = Date.parse(value);
-    if (!Number.isNaN(parsed)) {
-      return parsed;
-    }
-  }
-
-  return Date.now();
-}
-
-function normalizeActiveDocIds(value: unknown, legacyValue?: unknown) {
-  const ids = Array.isArray(value)
-    ? value
-    : typeof legacyValue === "string" && legacyValue
-      ? [legacyValue]
-      : [];
-
-  return [...new Set(ids)].filter(
-    (docId): docId is string => typeof docId === "string" && docId.trim().length > 0,
-  );
-}
-
-function normalizeChatMessage(value: unknown) {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  const message = value as Partial<ChatMessage> & {
-    id?: unknown;
-    role?: unknown;
-    content?: unknown;
-    sources?: unknown;
-    streaming?: unknown;
-  };
-
-  if (
-    typeof message.id !== "string" ||
-    (message.role !== "user" && message.role !== "assistant") ||
-    typeof message.content !== "string"
-  ) {
-    return null;
-  }
-
-  return {
-    id: message.id,
-    role: message.role,
-    content: message.content,
-    sources: Array.isArray(message.sources)
-      ? message.sources.filter((source): source is Source => Boolean(source) && typeof source === "object")
-      : undefined,
-    streaming: Boolean(message.streaming),
-  };
-}
-
-function normalizeChat(value: unknown): ChatSession | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  const chat = value as {
-    id?: unknown;
-    title?: unknown;
-    activeDocIds?: unknown;
-    activeDocId?: unknown;
-    messages?: unknown;
-    createdAt?: unknown;
-    updatedAt?: unknown;
-  };
-
-  if (
-    typeof chat.id !== "string" ||
-    typeof chat.title !== "string" ||
-    !Array.isArray(chat.messages)
-  ) {
-    return null;
-  }
-
-  const messages = chat.messages
-    .map((message) => normalizeChatMessage(message))
-    .filter((message): message is NonNullable<ReturnType<typeof normalizeChatMessage>> => Boolean(message));
-
-  if (messages.length === 0) {
-    return null;
-  }
-
-  return {
-    id: chat.id,
-    title: chat.title,
-    activeDocIds: normalizeActiveDocIds(chat.activeDocIds, chat.activeDocId),
-    messages,
-    createdAt: toTimestamp(chat.createdAt),
-    updatedAt: toTimestamp(chat.updatedAt),
-  };
-}
-
-function mapApiChat(chat: ChatResponse): ChatSession | null {
-  return normalizeChat({
-    id: chat.id,
-    title: chat.title,
-    activeDocIds: chat.active_doc_ids,
-    messages: chat.messages,
-    createdAt: chat.created_at,
-    updatedAt: chat.updated_at,
-  });
-}
-
-function mapDeletedChat(deleted: DeletedChatResponse): DeletedChatTombstone {
-  return {
-    id: deleted.id,
-    deletedAt: toTimestamp(deleted.deleted_at),
-  };
-}
-
-function sortChats(chats: ChatSession[]) {
-  return [...chats].sort((left, right) => right.updatedAt - left.updatedAt);
-}
-
-function mergeChatCollections(
-  remoteChats: ChatSession[],
-  localChats: ChatSession[],
-  deletedChats: DeletedChatTombstone[],
-) {
-  const deletedIds = new Set(deletedChats.map((deletedChat) => deletedChat.id));
-  const merged = new Map<string, ChatSession>();
-
-  for (const chat of sortChats(remoteChats)) {
-    merged.set(chat.id, chat);
-  }
-
-  for (const chat of sortChats(localChats.filter((localChat) => !deletedIds.has(localChat.id)))) {
-    const existingChat = merged.get(chat.id);
-
-    if (!existingChat || chat.updatedAt > existingChat.updatedAt) {
-      merged.set(chat.id, chat);
-    }
-  }
-
-  return sortChats([...merged.values()]);
-}
-
-function serializeChatForApi(chat: ChatSession) {
-  return {
-    id: chat.id,
-    title: chat.title,
-    active_doc_ids: normalizeActiveDocIds(chat.activeDocIds),
-    messages: chat.messages
-      .filter((message) => message.content.trim().length > 0)
-      .map((message) => ({
-        id: message.id,
-        role: message.role,
-        content: message.content,
-        sources: (message.sources ?? []).map((source) => ({
-          id: source.id,
-          text: source.text,
-          score: source.score,
-          doc_id: source.doc_id,
-          chunk_id: source.chunk_id,
-          page: source.page,
-          bbox: source.bbox,
-          line_boxes: source.line_boxes,
-        })),
-      })),
-    created_at: new Date(chat.createdAt).toISOString(),
-    updated_at: new Date(chat.updatedAt).toISOString(),
-  };
-}
-
-function hasStreamingChatMessages(chats: ChatSession[]) {
-  return chats.some((chat) => chat.messages.some((message) => message.streaming));
-}
-
-function mapApiUser(user: ApiUserResponse): AppUser {
-  return {
-    id: user.id,
-    email: user.email,
-    fullName: user.full_name,
-    createdAt: toTimestamp(user.created_at),
-  };
-}
-
-function mapAuthSession(response: AuthResponse): AuthSession {
-  return {
-    token: response.token,
-    expiresAt: toTimestamp(response.expires_at),
-    user: mapApiUser(response.user),
-  };
-}
-
-function mapApiDocument(document: DocumentSummaryResponse): AppDocument {
+function mapUploadedDocument(document: Awaited<ReturnType<typeof uploadPdf>>): AppDocument {
   return {
     id: document.doc_id,
     name: document.name,
-    uploadedAt: toTimestamp(document.uploaded_at),
+    uploadedAt: Date.parse(document.uploaded_at || new Date().toISOString()),
     chunkCount: document.chunks,
     pageCount: document.pages,
     ragMode: document.rag_mode,
@@ -267,169 +51,10 @@ function mapApiDocument(document: DocumentSummaryResponse): AppDocument {
   };
 }
 
-function mapSystemStatus(status: SystemStatusResponse): SystemStatus {
-  return {
-    status: status.status,
-    ragMode: status.rag_mode,
-    geminiModel: status.gemini_model,
-    llmConfigured: status.llm_configured,
-    embeddingModelLoaded: status.embedding_model_loaded,
-    rerankerLoaded: status.reranker_loaded,
-    vectorSearchEnabled: status.vector_search_enabled,
-    documentsIndexed: status.documents_indexed,
-    workspaceDataAvailable: status.workspace_data_available,
-  };
-}
-
-function mergeDocuments(...collections: AppDocument[][]) {
-  const merged = new Map<string, AppDocument>();
-
-  for (const collection of collections) {
-    for (const document of collection) {
-      const current = merged.get(document.id);
-      merged.set(document.id, current ? { ...current, ...document } : document);
-    }
-  }
-
-  return [...merged.values()].sort((left, right) => right.uploadedAt - left.uploadedAt);
-}
-
-function loadPersistedAuth(): AuthSession | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<{
-      token: unknown;
-      expiresAt: unknown;
-      user: Partial<AppUser>;
-    }>;
-    if (!parsed || typeof parsed.token !== "string" || !parsed.user) {
-      return null;
-    }
-
-    const user = parsed.user as Partial<AppUser>;
-    if (
-      typeof user.id !== "string" ||
-      typeof user.email !== "string" ||
-      typeof user.fullName !== "string"
-    ) {
-      return null;
-    }
-
-    const expiresAt = toTimestamp(parsed.expiresAt);
-    if (expiresAt <= Date.now()) {
-      return null;
-    }
-
-    return {
-      token: parsed.token,
-      expiresAt,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        createdAt: toTimestamp(user.createdAt),
-      },
-    };
-  } catch (error) {
-    console.error("Failed to load persisted auth session", error);
-    return null;
-  }
-}
-
-function getWorkspaceStorageKey(userId: string) {
-  return `${WORKSPACE_STORAGE_PREFIX}.${userId}`;
-}
-
-function readPasswordResetToken() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const token = new URLSearchParams(window.location.search).get(PASSWORD_RESET_QUERY_KEY);
-  return token && token.trim().length > 0 ? token.trim() : null;
-}
-
-function replacePasswordResetToken(token: string | null) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const url = new URL(window.location.href);
-  if (token) {
-    url.searchParams.set(PASSWORD_RESET_QUERY_KEY, token);
-  } else {
-    url.searchParams.delete(PASSWORD_RESET_QUERY_KEY);
-  }
-
-  window.history.replaceState({}, "", url.toString());
-}
-
-function loadPersistedWorkspace(userId: string): PersistedWorkspace | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(getWorkspaceStorageKey(userId));
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<PersistedWorkspace> & {
-      chats?: unknown[];
-    };
-    if (!Array.isArray(parsed.chats) || parsed.chats.length === 0) {
-      return null;
-    }
-
-    const chats = parsed.chats
-      .map((chat) => normalizeChat(chat))
-      .filter((chat): chat is ChatSession => Boolean(chat));
-
-    if (chats.length === 0) {
-      return null;
-    }
-
-    const activeNav =
-      parsed.activeNav === "documents" || parsed.activeNav === "activity"
-        ? parsed.activeNav
-        : "workspace";
-
-    return {
-      chats,
-      activeChatId:
-        typeof parsed.activeChatId === "string" && parsed.activeChatId
-          ? parsed.activeChatId
-          : chats[0].id,
-      activeNav,
-      viewerDocId: typeof parsed.viewerDocId === "string" ? parsed.viewerDocId : null,
-    };
-  } catch (error) {
-    console.error("Failed to load persisted workspace", error);
-    return null;
-  }
-}
-
 export default function App() {
-  const persistedAuth = loadPersistedAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-  const [auth, setAuth] = useState<AuthSession | null>(persistedAuth);
-  const [authLoading, setAuthLoading] = useState(Boolean(persistedAuth));
-  const [workspaceReady, setWorkspaceReady] = useState(() => !persistedAuth);
-  const [authSubmitting, setAuthSubmitting] = useState(false);
-  const [passwordResetToken, setPasswordResetToken] = useState<string | null>(() =>
-    readPasswordResetToken(),
-  );
   const [documents, setDocuments] = useState<AppDocument[]>([]);
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState("");
@@ -451,7 +76,66 @@ export default function App() {
   );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  const isAuthenticated = Boolean(auth?.token);
+  const resetWorkspaceState = useCallback((signedOutUserId: string | null) => {
+    clearPersistedWorkspace(signedOutUserId);
+    setDocuments([]);
+    setChats([]);
+    setActiveChatId("");
+    setActiveNav("workspace");
+    setViewerDocId(null);
+    setSelectedSource(null);
+    setPdfOpen(false);
+    setSystemStatus(null);
+    setInput("");
+    setLoading(false);
+    setUploading(false);
+    setDeletingChatId(null);
+    setClearingChats(false);
+    setDeletingDocId(null);
+    setClearingDocuments(false);
+    setMobileSidebarOpen(false);
+  }, []);
+
+  const {
+    authLoading,
+    authSubmitting,
+    currentUser,
+    isAuthenticated,
+    passwordResetToken,
+    clearPasswordResetToken,
+    handleAuthSubmit,
+    handlePasswordResetRequest,
+    handlePasswordResetConfirm,
+    handleLogout,
+    handleUnauthorized,
+  } = useAuthSession({
+    onSignedOut: resetWorkspaceState,
+  });
+
+  const {
+    workspaceReady,
+    chatsRef,
+    documentsRef,
+  } = useWorkspaceSync({
+    userId: currentUser?.id ?? null,
+    isAuthenticated,
+    uploading,
+    chats,
+    documents,
+    activeChatId,
+    activeNav,
+    viewerDocId,
+    setChats,
+    setDocuments,
+    setActiveChatId,
+    setActiveNav,
+    setViewerDocId,
+    setSelectedSource,
+    setPdfOpen,
+    setSystemStatus,
+    handleUnauthorized,
+  });
+
   const activeChat = useMemo(
     () => chats.find((chat) => chat.id === activeChatId) ?? chats[0] ?? null,
     [activeChatId, chats],
@@ -470,48 +154,10 @@ export default function App() {
     [documents, viewerDocId],
   );
 
-  const performLocalSignOut = () => {
-    setAuth(null);
-    setDocuments([]);
-    setChats([]);
-    setActiveChatId("");
-    setActiveNav("workspace");
-    setViewerDocId(null);
-    setSelectedSource(null);
-    setPdfOpen(false);
-    setSystemStatus(null);
-    setInput("");
-    setLoading(false);
-    setUploading(false);
-    setAuthLoading(false);
-    setWorkspaceReady(false);
-  };
-
-  const clearPasswordResetToken = () => {
-    setPasswordResetToken(null);
-    replacePasswordResetToken(null);
-  };
-
-  const handleUnauthorized = (error: unknown) => {
-    if (error instanceof ApiError && error.status === 401) {
-      performLocalSignOut();
-      return true;
-    }
-
-    return false;
-  };
-
   useEffect(() => {
-    if (!activeChat) return;
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeChat]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-
     const mediaQuery = window.matchMedia("(min-width: 1024px)");
-    const syncLayoutMode = (event?: MediaQueryListEvent) => {
-      const nextIsDesktop = event?.matches ?? mediaQuery.matches;
+    const syncLayoutMode = () => {
+      const nextIsDesktop = mediaQuery.matches;
       setIsDesktop(nextIsDesktop);
       if (nextIsDesktop) {
         setMobileSidebarOpen(false);
@@ -525,272 +171,64 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    setAuthToken(auth?.token ?? null);
-
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    if (!auth) {
-      window.localStorage.removeItem(AUTH_STORAGE_KEY);
-      return;
-    }
-
-    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
-  }, [auth]);
-
-  useEffect(() => {
-    if (!auth?.token) {
-      setAuthLoading(false);
-      return;
-    }
-
-    let ignore = false;
-    setAuthLoading(true);
-
-    getCurrentUser()
-      .then((response) => {
-        if (ignore) {
-          return;
-        }
-
-        setAuth((currentAuth) =>
-          currentAuth
-            ? {
-                ...currentAuth,
-                user: mapApiUser(response.user),
-              }
-            : currentAuth,
-        );
-      })
-      .catch((error) => {
-        if (!ignore) {
-          console.error("Failed to validate auth session", error);
-          performLocalSignOut();
-        }
-      })
-      .finally(() => {
-        if (!ignore) {
-          setAuthLoading(false);
-        }
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [auth?.token]);
-
-  useEffect(() => {
-    if (!auth?.user.id) {
-      setWorkspaceReady(false);
-      return;
-    }
-
-    let ignore = false;
-    const persistedWorkspace = loadPersistedWorkspace(auth.user.id);
-    setWorkspaceReady(false);
-
-    listChats()
-      .then((response) => {
-        if (ignore) {
-          return;
-        }
-
-        const remoteChats = response.chats
-          .map((chat) => mapApiChat(chat))
-          .filter((chat): chat is ChatSession => Boolean(chat));
-        const deletedChats = response.deleted.map((deletedChat) => mapDeletedChat(deletedChat));
-        const mergedChats = mergeChatCollections(
-          remoteChats,
-          persistedWorkspace?.chats ?? [],
-          deletedChats,
-        );
-        const nextChats = mergedChats.length > 0 ? mergedChats : [createChat()];
-        const nextActiveChatId =
-          persistedWorkspace?.activeChatId &&
-          nextChats.some((chat) => chat.id === persistedWorkspace.activeChatId)
-            ? persistedWorkspace.activeChatId
-            : nextChats[0].id;
-
-        setChats(nextChats);
-        setActiveChatId(nextActiveChatId);
-        setActiveNav(persistedWorkspace?.activeNav ?? "workspace");
-        setViewerDocId(persistedWorkspace?.viewerDocId ?? null);
-        setSelectedSource(null);
-        setPdfOpen(false);
-        setWorkspaceReady(true);
-      })
-      .catch((error) => {
-        if (ignore) {
-          return;
-        }
-
-        console.error("Failed to load remote chat history", error);
-        if (handleUnauthorized(error)) {
-          return;
-        }
-
-        const fallbackChats = persistedWorkspace?.chats ?? [createChat()];
-        const fallbackActiveChatId =
-          persistedWorkspace?.activeChatId &&
-          fallbackChats.some((chat) => chat.id === persistedWorkspace.activeChatId)
-            ? persistedWorkspace.activeChatId
-            : fallbackChats[0].id;
-
-        setChats(fallbackChats);
-        setActiveChatId(fallbackActiveChatId);
-        setActiveNav(persistedWorkspace?.activeNav ?? "workspace");
-        setViewerDocId(persistedWorkspace?.viewerDocId ?? null);
-        setSelectedSource(null);
-        setPdfOpen(false);
-        setWorkspaceReady(true);
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [auth?.user.id]);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-
-    let ignore = false;
-
-    Promise.allSettled([listDocuments(), getSystemStatus()]).then((results) => {
-      if (ignore) {
-        return;
-      }
-
-      const [documentsResult, systemResult] = results;
-
-      if (documentsResult.status === "fulfilled") {
-        const remoteDocuments = documentsResult.value.documents.map(mapApiDocument);
-        startTransition(() => {
-          setDocuments(remoteDocuments);
-          setChats((currentChats) =>
-            currentChats.map((chat) => ({
-              ...chat,
-              activeDocIds: chat.activeDocIds.filter((docId) =>
-                remoteDocuments.some((document) => document.id === docId),
-              ),
-            })),
-          );
-        });
-      } else {
-        console.error("Failed to load indexed documents", documentsResult.reason);
-        if (documentsResult.reason instanceof ApiError && documentsResult.reason.status === 401) {
-          performLocalSignOut();
-          return;
-        }
-      }
-
-      if (systemResult.status === "fulfilled") {
-        setSystemStatus(mapSystemStatus(systemResult.value));
-      } else {
-        console.error("Failed to load system status", systemResult.reason);
-        if (systemResult.reason instanceof ApiError && systemResult.reason.status === 401) {
-          performLocalSignOut();
-        }
-      }
+    chatEndRef.current?.scrollIntoView({
+      behavior: loading ? "auto" : "smooth",
+      block: "end",
     });
+  }, [activeChat?.messages, loading]);
 
-    return () => {
-      ignore = true;
-    };
-  }, [isAuthenticated]);
+  const pdfRequest = useMemo(
+    () =>
+      viewerDocId && viewerDocument?.pdfAvailable
+        ? buildPdfRequest(viewerDocId)
+        : null,
+    [viewerDocId, viewerDocument?.pdfAvailable],
+  );
 
-  useEffect(() => {
-    const nextActiveDocIds = activeChat?.activeDocIds ?? [];
-
-    if (nextActiveDocIds.length === 0) {
-      setViewerDocId(null);
-      setPdfOpen(false);
-      return;
-    }
-
-    setViewerDocId((current) =>
-      current && nextActiveDocIds.includes(current) ? current : nextActiveDocIds[0],
-    );
-  }, [activeChat?.activeDocIds]);
-
-  useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      !auth?.user.id ||
-      chats.length === 0 ||
-      !activeChat
-    ) {
-      return;
-    }
-
-    const payload: PersistedWorkspace = {
-      chats,
-      activeChatId: activeChat.id,
-      activeNav,
-      viewerDocId,
-    };
-
-    window.localStorage.setItem(getWorkspaceStorageKey(auth.user.id), JSON.stringify(payload));
-  }, [activeChat, activeNav, auth?.user.id, chats, viewerDocId]);
-
-  useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      !workspaceReady ||
-      !auth?.user.id ||
-      chats.length === 0 ||
-      hasStreamingChatMessages(chats)
-    ) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      void syncChats(chats.map((chat) => serializeChatForApi(chat))).catch((error) => {
-        console.error("Failed to sync chat history", error);
-        handleUnauthorized(error);
-      });
-    }, 700);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [auth?.user.id, chats, workspaceReady]);
-
-  const pdfUrl =
-    viewerDocId && auth?.token && viewerDocument?.pdfAvailable
-      ? `${API_URL}/api/pdf/${viewerDocId}?token=${encodeURIComponent(auth.token)}`
-      : "";
-
-  const updateChat = (
-    chatId: string,
-    updater: (chat: ChatSession) => ChatSession,
-  ) => {
-    setChats((currentChats) =>
-      currentChats.map((chat) => (chat.id === chatId ? updater(chat) : chat)),
-    );
-  };
-
-  const activateChat = (chat: ChatSession, options?: { clearInput?: boolean }) => {
-    setActiveChatId(chat.id);
-    setViewerDocId(chat.activeDocIds[0] ?? null);
-    setSelectedSource(null);
-    setPdfOpen(false);
-
-    if (options?.clearInput) {
-      setInput("");
-    }
-  };
-
-  const setViewerDocument = (docId: string) => {
+  const setViewerDocument = useCallback((docId: string) => {
     setViewerDocId(docId);
-    setSelectedSource((currentSource) =>
-      currentSource?.doc_id && currentSource.doc_id !== docId ? null : currentSource,
-    );
+    setSelectedSource(null);
     setPdfFocusToken((current) => current + 1);
-  };
+  }, []);
+
+  const updateChat = useCallback(
+    (chatId: string, updater: (chat: ChatSession) => ChatSession) => {
+      setChats((currentChats) =>
+        sortChats(
+          currentChats.map((chat) => (chat.id === chatId ? updater(chat) : chat)),
+        ),
+      );
+    },
+    [],
+  );
+
+  const activateChat = useCallback(
+    (chat: ChatSession, options?: { clearInput?: boolean }) => {
+      const nextViewerDocId =
+        viewerDocId && chat.activeDocIds.includes(viewerDocId)
+          ? viewerDocId
+          : chat.activeDocIds[0] ?? null;
+
+      setActiveChatId(chat.id);
+      setViewerDocId(nextViewerDocId);
+      setSelectedSource(null);
+      setPdfOpen(false);
+
+      if (options?.clearInput) {
+        setInput("");
+      }
+
+      if (!isDesktop) {
+        setMobileSidebarOpen(false);
+      }
+    },
+    [isDesktop, viewerDocId],
+  );
 
   const toggleActiveChatDocument = (docId: string) => {
-    if (!activeChat) return;
+    if (!activeChat) {
+      return;
+    }
 
     const isActive = activeChat.activeDocIds.includes(docId);
     const nextActiveDocIds = isActive
@@ -950,7 +388,7 @@ export default function App() {
 
     try {
       const data = await uploadPdf(file);
-      const nextDocument = mapApiDocument(data);
+      const nextDocument = mapUploadedDocument(data);
 
       if (!data.doc_id) {
         updateChat(targetChatId, (chat) => ({
@@ -966,9 +404,8 @@ export default function App() {
         return;
       }
 
-      setDocuments((currentDocuments) => {
-        return mergeDocuments(currentDocuments, [nextDocument]);
-      });
+      const nextDocuments = mergeDocuments(documentsRef.current, [nextDocument]);
+      setDocuments(nextDocuments);
 
       updateChat(targetChatId, (chat) => ({
         ...chat,
@@ -989,7 +426,7 @@ export default function App() {
         currentStatus
           ? {
               ...currentStatus,
-              documentsIndexed: Math.max(currentStatus.documentsIndexed, documents.length + 1),
+              documentsIndexed: Math.max(currentStatus.documentsIndexed, nextDocuments.length),
               workspaceDataAvailable: true,
             }
           : currentStatus,
@@ -1047,7 +484,9 @@ export default function App() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || loading || !activeChat) return;
+    if (!input.trim() || loading || !activeChat) {
+      return;
+    }
 
     if (activeChat.activeDocIds.length === 0) {
       updateChat(activeChat.id, (chat) => ({
@@ -1290,73 +729,15 @@ export default function App() {
     }
   };
 
-  const handleAuthSubmit = async (payload: {
-    mode: "login" | "register";
-    fullName: string;
-    email: string;
-    password: string;
-  }) => {
-    setAuthSubmitting(true);
-    setWorkspaceReady(false);
-
-    try {
-      const response =
-        payload.mode === "login"
-          ? await loginUser({
-              email: payload.email,
-              password: payload.password,
-            })
-          : await registerUser({
-              fullName: payload.fullName,
-              email: payload.email,
-              password: payload.password,
-            });
-
-      setAuth(mapAuthSession(response));
-      setAuthLoading(true);
-      setInput("");
-      clearPasswordResetToken();
-    } finally {
-      setAuthSubmitting(false);
-    }
-  };
-
-  const handlePasswordResetRequest = async (email: string) => {
-    setAuthSubmitting(true);
-
-    try {
-      return await requestPasswordReset({ email });
-    } finally {
-      setAuthSubmitting(false);
-    }
-  };
-
-  const handlePasswordResetConfirm = async (payload: {
-    token: string;
-    password: string;
-  }) => {
-    setAuthSubmitting(true);
-
-    try {
-      return await confirmPasswordReset(payload);
-    } finally {
-      setAuthSubmitting(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      if (auth?.token) {
-        await logoutUser();
-      }
-    } catch (error) {
-      console.error("Failed to logout cleanly", error);
-    } finally {
-      performLocalSignOut();
-    }
-  };
-
-  const currentUser = auth?.user;
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-6 text-white">
+        <div className="rounded-[28px] border border-white/10 bg-[var(--panel)] px-6 py-5 text-sm text-[var(--muted-foreground)] shadow-[0_24px_80px_-48px_rgba(15,23,42,0.8)]">
+          Restoring your private workspace...
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -1371,7 +752,7 @@ export default function App() {
     );
   }
 
-  if (authLoading || !workspaceReady || !activeChat || !currentUser) {
+  if (!workspaceReady || !activeChat || !currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-6 text-white">
         <div className="rounded-[28px] border border-white/10 bg-[var(--panel)] px-6 py-5 text-sm text-[var(--muted-foreground)] shadow-[0_24px_80px_-48px_rgba(15,23,42,0.8)]">
@@ -1420,7 +801,7 @@ export default function App() {
           onNewChat={startNewChat}
           onOpenUpload={() => fileInputRef.current?.click()}
           onSelectChat={(chatId) => {
-            const nextChat = chats.find((chat) => chat.id === chatId);
+            const nextChat = chatsRef.current.find((chat) => chat.id === chatId);
             if (nextChat) {
               activateChat(nextChat);
             }
@@ -1451,7 +832,7 @@ export default function App() {
           <ViewerPanel
             activeDocuments={activeDocuments}
             focusToken={pdfFocusToken}
-            pdfUrl={pdfUrl}
+            pdfRequest={pdfRequest}
             selectedSource={selectedSource}
             viewerDocId={viewerDocId}
             onSelectViewerDoc={setViewerDocument}
@@ -1467,7 +848,7 @@ export default function App() {
         activeDocuments={activeDocuments}
         open={pdfOpen && !isDesktop}
         onClose={() => setPdfOpen(false)}
-        fileUrl={pdfUrl}
+        fileRequest={pdfRequest}
         highlight={selectedSource}
         focusToken={pdfFocusToken}
         viewerDocId={viewerDocId}

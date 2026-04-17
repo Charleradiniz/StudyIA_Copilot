@@ -36,10 +36,12 @@ vi.mock("./components/workspace/ViewerPanel", () => ({
 
 import App from "./App";
 
-const AUTH_STORAGE_KEY = "studyiacopilot.auth.v1";
 const WORKSPACE_STORAGE_KEY = "studyiacopilot.workspace.v3.user-1";
 
 afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  window.localStorage.clear();
   window.history.replaceState({}, "", "/");
 });
 
@@ -53,22 +55,8 @@ function jsonResponse(data: unknown, init?: ResponseInit) {
   });
 }
 
-function handleDefaultChatRequests(url: string, method: string) {
-  if (url.endsWith("/api/chats") && method === "GET") {
-    return jsonResponse({
-      chats: [],
-      deleted: [],
-    });
-  }
-
-  if (url.endsWith("/api/chats/sync") && method === "POST") {
-    return jsonResponse({
-      synced_chat_ids: [],
-      skipped_chat_ids: [],
-    });
-  }
-
-  return null;
+function unauthorizedResponse(message = "Authentication required.") {
+  return jsonResponse({ detail: message }, { status: 401 });
 }
 
 function createSystemStatus(overrides: Partial<Record<string, unknown>> = {}) {
@@ -96,20 +84,12 @@ function createUser(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-function persistAuth() {
-  window.localStorage.setItem(
-    AUTH_STORAGE_KEY,
-    JSON.stringify({
-      token: "token-123",
-      expiresAt: Date.parse("2026-05-09T12:00:00.000Z"),
-      user: {
-        id: "user-1",
-        email: "charles@example.com",
-        fullName: "Charles Study",
-        createdAt: Date.parse("2026-04-09T11:00:00.000Z"),
-      },
-    }),
-  );
+function createAuthPayload(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    expires_at: "2026-05-09T12:00:00.000Z",
+    user: createUser(),
+    ...overrides,
+  };
 }
 
 function createDocument(overrides: Partial<Record<string, unknown>> = {}) {
@@ -160,10 +140,26 @@ function persistWorkspace(overrides: Partial<Record<string, unknown>> = {}) {
   );
 }
 
+function handleDefaultChatRequests(url: string, method: string) {
+  if (url.endsWith("/api/chats") && method === "GET") {
+    return jsonResponse({
+      chats: [],
+      deleted: [],
+    });
+  }
+
+  if (url.endsWith("/api/chats/sync") && method === "POST") {
+    return jsonResponse({
+      synced_chat_ids: [],
+      skipped_chat_ids: [],
+    });
+  }
+
+  return null;
+}
+
 describe("App", () => {
   it("hydrates runtime status and remote documents on load", async () => {
-    persistAuth();
-
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -171,9 +167,7 @@ describe("App", () => {
         const method = init?.method ?? "GET";
 
         if (url.endsWith("/api/auth/me") && method === "GET") {
-          return jsonResponse({
-            user: createUser(),
-          });
+          return jsonResponse(createAuthPayload());
         }
 
         if (url.endsWith("/api/documents") && method === "GET") {
@@ -184,13 +178,6 @@ describe("App", () => {
 
         if (url.endsWith("/api/system/status") && method === "GET") {
           return jsonResponse(createSystemStatus());
-        }
-
-        if (url.endsWith("/api/chats/chat-seeded") && method === "DELETE") {
-          return jsonResponse({
-            chat_id: "chat-seeded",
-            deleted: true,
-          });
         }
 
         const chatResponse = handleDefaultChatRequests(url, method);
@@ -212,8 +199,6 @@ describe("App", () => {
   });
 
   it("switches sidebar content across workspace, documents, and activity", async () => {
-    persistAuth();
-
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -221,9 +206,7 @@ describe("App", () => {
         const method = init?.method ?? "GET";
 
         if (url.endsWith("/api/auth/me") && method === "GET") {
-          return jsonResponse({
-            user: createUser(),
-          });
+          return jsonResponse(createAuthPayload());
         }
 
         if (url.endsWith("/api/documents") && method === "GET") {
@@ -234,13 +217,6 @@ describe("App", () => {
 
         if (url.endsWith("/api/system/status") && method === "GET") {
           return jsonResponse(createSystemStatus());
-        }
-
-        if (url.endsWith("/api/chats/chat-seeded") && method === "DELETE") {
-          return jsonResponse({
-            chat_id: "chat-seeded",
-            deleted: true,
-          });
         }
 
         const chatResponse = handleDefaultChatRequests(url, method);
@@ -275,16 +251,12 @@ describe("App", () => {
   });
 
   it("asks across multiple active PDFs and switches the viewer to the sourced file", async () => {
-    persistAuth();
-
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
 
       if (url.endsWith("/api/auth/me") && method === "GET") {
-        return jsonResponse({
-          user: createUser(),
-        });
+        return jsonResponse(createAuthPayload());
       }
 
       if (url.endsWith("/api/documents") && method === "GET") {
@@ -379,8 +351,6 @@ describe("App", () => {
   });
 
   it("uploads a document and answers a grounded question", async () => {
-    persistAuth();
-
     const uploadedDocument = createDocument({
       doc_id: "doc-uploaded",
       name: "Study Guide.pdf",
@@ -395,9 +365,7 @@ describe("App", () => {
       const method = init?.method ?? "GET";
 
       if (url.endsWith("/api/auth/me") && method === "GET") {
-        return jsonResponse({
-          user: createUser(),
-        });
+        return jsonResponse(createAuthPayload());
       }
 
       if (url.endsWith("/api/documents") && method === "GET") {
@@ -487,7 +455,6 @@ describe("App", () => {
   });
 
   it("deletes a document from the library and clears the active viewer", async () => {
-    persistAuth();
     vi.stubGlobal("confirm", vi.fn(() => true));
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -495,9 +462,7 @@ describe("App", () => {
       const method = init?.method ?? "GET";
 
       if (url.endsWith("/api/auth/me") && method === "GET") {
-        return jsonResponse({
-          user: createUser(),
-        });
+        return jsonResponse(createAuthPayload());
       }
 
       if (url.endsWith("/api/documents") && method === "GET") {
@@ -551,7 +516,6 @@ describe("App", () => {
 
   it("deletes the active chat and recreates a clean workspace session", async () => {
     vi.stubGlobal("confirm", vi.fn(() => true));
-    persistAuth();
     persistWorkspace();
 
     vi.stubGlobal(
@@ -561,9 +525,7 @@ describe("App", () => {
         const method = init?.method ?? "GET";
 
         if (url.endsWith("/api/auth/me") && method === "GET") {
-          return jsonResponse({
-            user: createUser(),
-          });
+          return jsonResponse(createAuthPayload());
         }
 
         if (url.endsWith("/api/documents") && method === "GET") {
@@ -607,23 +569,192 @@ describe("App", () => {
     });
   });
 
+  it("refreshes remote chat updates when the window regains focus", async () => {
+    persistWorkspace();
+
+    let remoteChatsPayload = {
+      chats: [
+        {
+          id: "chat-seeded",
+          title: "Strategy Review",
+          active_doc_ids: ["doc-1"],
+          messages: [
+            {
+              id: "msg-1",
+              role: "assistant",
+              content: "Upload a PDF to begin.",
+              sources: [],
+            },
+            {
+              id: "msg-2",
+              role: "user",
+              content: "Summarize the strategy.",
+              sources: [],
+            },
+          ],
+          created_at: "2026-04-09T12:00:00.000Z",
+          updated_at: "2026-04-09T12:10:00.000Z",
+        },
+      ],
+      deleted: [],
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+
+        if (url.endsWith("/api/auth/me") && method === "GET") {
+          return jsonResponse(createAuthPayload());
+        }
+
+        if (url.endsWith("/api/documents") && method === "GET") {
+          return jsonResponse({
+            documents: [createDocument()],
+          });
+        }
+
+        if (url.endsWith("/api/system/status") && method === "GET") {
+          return jsonResponse(createSystemStatus());
+        }
+
+        if (url.endsWith("/api/chats") && method === "GET") {
+          return jsonResponse(remoteChatsPayload);
+        }
+
+        if (url.endsWith("/api/chats/sync") && method === "POST") {
+          return jsonResponse({
+            synced_chat_ids: [],
+            skipped_chat_ids: [],
+          });
+        }
+
+        throw new Error(`Unhandled request: ${method} ${url}`);
+      }),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Strategy Review" })).toBeInTheDocument();
+
+    remoteChatsPayload = {
+      chats: [
+        {
+          id: "chat-seeded",
+          title: "Strategy Review",
+          active_doc_ids: ["doc-1"],
+          messages: [
+            {
+              id: "msg-1",
+              role: "assistant",
+              content: "Upload a PDF to begin.",
+              sources: [],
+            },
+            {
+              id: "msg-2",
+              role: "user",
+              content: "Summarize the strategy.",
+              sources: [],
+            },
+            {
+              id: "msg-3",
+              role: "assistant",
+              content: "Updated from mobile.",
+              sources: [],
+            },
+          ],
+          created_at: "2026-04-09T12:00:00.000Z",
+          updated_at: "2026-04-09T12:20:00.000Z",
+        },
+      ],
+      deleted: [],
+    };
+
+    window.dispatchEvent(new Event("focus"));
+
+    expect(await screen.findByText("Updated from mobile.")).toBeInTheDocument();
+  });
+
+  it("refreshes remote documents when the window regains focus", async () => {
+    persistWorkspace();
+
+    let remoteDocumentsPayload = {
+      documents: [createDocument()],
+    };
+    let remoteSystemStatus = createSystemStatus();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+
+        if (url.endsWith("/api/auth/me") && method === "GET") {
+          return jsonResponse(createAuthPayload());
+        }
+
+        if (url.endsWith("/api/documents") && method === "GET") {
+          return jsonResponse(remoteDocumentsPayload);
+        }
+
+        if (url.endsWith("/api/system/status") && method === "GET") {
+          return jsonResponse(remoteSystemStatus);
+        }
+
+        const chatResponse = handleDefaultChatRequests(url, method);
+        if (chatResponse) {
+          return chatResponse;
+        }
+
+        throw new Error(`Unhandled request: ${method} ${url}`);
+      }),
+    );
+
+    render(<App />);
+
+    expect((await screen.findAllByText("Research Plan.pdf")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Mobile Upload.pdf")).not.toBeInTheDocument();
+
+    remoteDocumentsPayload = {
+      documents: [
+        createDocument(),
+        createDocument({
+          doc_id: "doc-mobile",
+          name: "Mobile Upload.pdf",
+          chunks: 4,
+          pages: 5,
+          uploaded_at: "2026-04-10T18:30:00.000Z",
+          preview: "Freshly uploaded from the other device.",
+        }),
+      ],
+    };
+    remoteSystemStatus = createSystemStatus({
+      documents_indexed: 2,
+    });
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    window.dispatchEvent(new Event("focus"));
+
+    expect((await screen.findAllByText("Mobile Upload.pdf")).length).toBeGreaterThan(0);
+    expect(screen.getByText("4 chunks")).toBeInTheDocument();
+    expect(screen.getByText("5 pages")).toBeInTheDocument();
+  });
+
   it("shows the authentication screen and signs in", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
 
-      if (url.endsWith("/api/auth/login") && method === "POST") {
-        return jsonResponse({
-          token: "token-123",
-          expires_at: "2026-05-09T12:00:00.000Z",
-          user: createUser(),
-        });
+      if (url.endsWith("/api/auth/me") && method === "GET") {
+        return unauthorizedResponse();
       }
 
-      if (url.endsWith("/api/auth/me") && method === "GET") {
-        return jsonResponse({
-          user: createUser(),
-        });
+      if (url.endsWith("/api/auth/login") && method === "POST") {
+        return jsonResponse(createAuthPayload());
       }
 
       if (url.endsWith("/api/documents") && method === "GET") {
@@ -649,7 +780,9 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(screen.getByText("Private AI research workspaces for every user.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Private AI research workspaces for every user."),
+    ).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Email"), "charles@example.com");
     await user.type(screen.getByLabelText("Password"), "password123");
@@ -664,6 +797,10 @@ describe("App", () => {
       const url = String(input);
       const method = init?.method ?? "GET";
 
+      if (url.endsWith("/api/auth/me") && method === "GET") {
+        return unauthorizedResponse();
+      }
+
       if (url.endsWith("/api/auth/password-reset/request") && method === "POST") {
         const body = JSON.parse(String(init?.body));
         expect(body.email).toBe("charles@example.com");
@@ -674,11 +811,6 @@ describe("App", () => {
         });
       }
 
-      const chatResponse = handleDefaultChatRequests(url, method);
-      if (chatResponse) {
-        return chatResponse;
-      }
-
       throw new Error(`Unhandled request: ${method} ${url}`);
     });
 
@@ -687,7 +819,7 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "Forgot password?" }));
+    await user.click(await screen.findByRole("button", { name: "Forgot password?" }));
     await user.type(screen.getByLabelText("Email"), "charles@example.com");
     await user.click(screen.getByRole("button", { name: "Send reset link" }));
 
@@ -700,6 +832,10 @@ describe("App", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
+
+      if (url.endsWith("/api/auth/me") && method === "GET") {
+        return unauthorizedResponse();
+      }
 
       if (url.endsWith("/api/auth/password-reset/confirm") && method === "POST") {
         const body = JSON.parse(String(init?.body));
@@ -714,11 +850,6 @@ describe("App", () => {
         });
       }
 
-      const chatResponse = handleDefaultChatRequests(url, method);
-      if (chatResponse) {
-        return chatResponse;
-      }
-
       throw new Error(`Unhandled request: ${method} ${url}`);
     });
 
@@ -727,7 +858,7 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(screen.getByText("Choose a new password")).toBeInTheDocument();
+    expect(await screen.findByText("Choose a new password")).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("New password"), "new-password-456");
     await user.type(screen.getByLabelText("Confirm new password"), "new-password-456");

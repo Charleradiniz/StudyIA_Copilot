@@ -2,10 +2,17 @@ from datetime import datetime, timezone
 import logging
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.config import (
+    AUTH_SESSION_COOKIE_DOMAIN,
+    AUTH_SESSION_COOKIE_NAME,
+    AUTH_SESSION_COOKIE_PATH,
+    AUTH_SESSION_COOKIE_SAMESITE,
+    AUTH_SESSION_COOKIE_SECURE,
+)
 from app.db.deps import get_current_session, get_current_user, get_db
 from app.models.auth_session import AuthSession
 from app.models.password_reset_token import PasswordResetToken
@@ -77,13 +84,32 @@ def serialize_user(user: User) -> dict:
     }
 
 
-def resolve_request_origin(request: Request) -> str | None:
-    origin = (request.headers.get("origin") or "").strip()
-    if origin:
-        return origin.rstrip("/")
+def set_auth_cookie(response: Response, token: str, session: AuthSession) -> None:
+    max_age = max(
+        int((session.expires_at.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).total_seconds()),
+        0,
+    )
+    response.set_cookie(
+        key=AUTH_SESSION_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=AUTH_SESSION_COOKIE_SECURE or AUTH_SESSION_COOKIE_SAMESITE == "none",
+        samesite=AUTH_SESSION_COOKIE_SAMESITE,
+        domain=AUTH_SESSION_COOKIE_DOMAIN,
+        path=AUTH_SESSION_COOKIE_PATH,
+        max_age=max_age,
+    )
 
-    base_url = str(request.base_url).strip()
-    return base_url.rstrip("/") if base_url else None
+
+def clear_auth_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=AUTH_SESSION_COOKIE_NAME,
+        domain=AUTH_SESSION_COOKIE_DOMAIN,
+        path=AUTH_SESSION_COOKIE_PATH,
+        secure=AUTH_SESSION_COOKIE_SECURE or AUTH_SESSION_COOKIE_SAMESITE == "none",
+        httponly=True,
+        samesite=AUTH_SESSION_COOKIE_SAMESITE,
+    )
 
 
 def create_user_session(db: Session, user: User) -> tuple[str, AuthSession]:
@@ -99,9 +125,8 @@ def create_user_session(db: Session, user: User) -> tuple[str, AuthSession]:
     return token, session
 
 
-def build_auth_payload(user: User, token: str, session: AuthSession) -> dict:
+def build_auth_payload(user: User, session: AuthSession) -> dict:
     return {
-        "token": token,
         "expires_at": serialize_datetime(session.expires_at),
         "user": serialize_user(user),
     }
@@ -134,7 +159,11 @@ def invalidate_password_reset_tokens(db: Session, user_id: str) -> None:
 
 
 @router.post("/register")
-def register_user(data: RegisterRequest, db: Session = Depends(get_db)):
+def register_user(
+    data: RegisterRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     email = validate_email(data.email)
     existing_user = db.query(User).filter(User.email == email).first()
     if existing_user:
@@ -153,11 +182,16 @@ def register_user(data: RegisterRequest, db: Session = Depends(get_db)):
     db.refresh(user)
 
     token, session = create_user_session(db, user)
-    return build_auth_payload(user, token, session)
+    set_auth_cookie(response, token, session)
+    return build_auth_payload(user, session)
 
 
 @router.post("/login")
-def login_user(data: LoginRequest, db: Session = Depends(get_db)):
+def login_user(
+    data: LoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     email = validate_email(data.email)
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(data.password, user.password_hash):
@@ -167,12 +201,12 @@ def login_user(data: LoginRequest, db: Session = Depends(get_db)):
         )
 
     token, session = create_user_session(db, user)
-    return build_auth_payload(user, token, session)
+    set_auth_cookie(response, token, session)
+    return build_auth_payload(user, session)
 
 
 @router.post("/password-reset/request")
 def request_password_reset(
-    request: Request,
     data: PasswordResetRequest,
     db: Session = Depends(get_db),
 ):
@@ -186,7 +220,6 @@ def request_password_reset(
                 recipient_email=user.email,
                 recipient_name=user.full_name,
                 reset_token=token,
-                request_origin=resolve_request_origin(request),
             )
         except EmailConfigurationError as exc:
             db.query(PasswordResetToken).filter(
@@ -273,15 +306,23 @@ def confirm_password_reset(
 
 
 @router.get("/me")
-def get_me(current_user: User = Depends(get_current_user)):
-    return {"user": serialize_user(current_user)}
+def get_me(
+    current_user: User = Depends(get_current_user),
+    session: AuthSession = Depends(get_current_session),
+):
+    return {
+        "expires_at": serialize_datetime(session.expires_at),
+        "user": serialize_user(current_user),
+    }
 
 
 @router.post("/logout")
 def logout_user(
+    response: Response,
     session: AuthSession = Depends(get_current_session),
     db: Session = Depends(get_db),
 ):
     db.delete(session)
     db.commit()
+    clear_auth_cookie(response)
     return {"logged_out": True}

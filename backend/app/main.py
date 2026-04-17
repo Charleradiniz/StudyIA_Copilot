@@ -5,7 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import CORS_ORIGINS, UPLOAD_DIR
-from app.db.database import Base, engine
+from app.db.database import engine
+from app.db.migrations import run_database_migrations
 from app.models import auth_session, chat_session, document, password_reset_token, user
 from app.routes.auth import router as auth_router
 from app.routes.chats import router as chats_router
@@ -24,9 +25,9 @@ logger = logging.getLogger("studyiacopilot.app")
 
 if engine is not None:
     try:
-        Base.metadata.create_all(bind=engine)
+        run_database_migrations()
     except Exception as exc:
-        logger.warning("Database initialization skipped: %s", exc)
+        logger.warning("Database migrations skipped: %s", exc)
 
 
 app = FastAPI(title="StudyIA Copilot API")
