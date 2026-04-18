@@ -6,6 +6,7 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
+import { buildAssistantStreamPlan } from "./app/assistant-stream";
 import { createAssistantMessage, createChat, createId } from "./app/chat-utils";
 import {
   clearPersistedWorkspace,
@@ -337,8 +338,32 @@ export default function App() {
     fullText: string,
     sources: Source[],
   ) => {
-    const step = fullText.length > 320 ? 3 : 1;
-    let index = step;
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const streamPlan = buildAssistantStreamPlan(fullText, {
+      prefersReducedMotion,
+    });
+
+    if (streamPlan.immediate) {
+      updateChat(chatId, (chat) => ({
+        ...chat,
+        updatedAt: Date.now(),
+        messages: chat.messages.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                content: fullText,
+                sources,
+                streaming: false,
+              }
+            : message,
+        ),
+      }));
+      return;
+    }
+
+    let index = streamPlan.charsPerUpdate;
 
     while (index < fullText.length) {
       const nextSlice = fullText.slice(0, index);
@@ -358,8 +383,8 @@ export default function App() {
         ),
       }));
 
-      await new Promise((resolve) => window.setTimeout(resolve, 14));
-      index += step;
+      await new Promise((resolve) => window.setTimeout(resolve, streamPlan.intervalMs));
+      index += streamPlan.charsPerUpdate;
     }
 
     updateChat(chatId, (chat) => ({
